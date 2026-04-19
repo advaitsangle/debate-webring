@@ -21,8 +21,7 @@ Thanks for applying! Please fill in the fields below. A maintainer will review a
 **Checklist**
 
 - [ ] I've added my entry to the end of the `SITES` array in `sites.js`
-- [ ] My site is live and accessible at the URL above
-- [ ] The content on my site is primarily my own
+- [ ] My site is live and accessible at the URL above, and links back to the webring
 
 ---
 
