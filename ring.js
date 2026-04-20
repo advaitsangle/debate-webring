@@ -530,6 +530,37 @@
     return parts[parts.length - 1].trim();
   }
 
+  const COUNTRY_CODES = {
+    'Afghanistan':'AF','Albania':'AL','Algeria':'DZ','Argentina':'AR','Armenia':'AM',
+    'Australia':'AU','Austria':'AT','Azerbaijan':'AZ','Bangladesh':'BD','Belgium':'BE',
+    'Bolivia':'BO','Bosnia':'BA','Brazil':'BR','Bulgaria':'BG','Cambodia':'KH',
+    'Canada':'CA','Chile':'CL','China':'CN','Colombia':'CO','Croatia':'HR',
+    'Cyprus':'CY','Czech Republic':'CZ','Denmark':'DK','Ecuador':'EC','Egypt':'EG',
+    'Estonia':'EE','Ethiopia':'ET','Finland':'FI','France':'FR','Georgia':'GE',
+    'Germany':'DE','Ghana':'GH','Greece':'GR','Hong Kong':'HK','Hungary':'HU',
+    'Iceland':'IS','India':'IN','Indonesia':'ID','Iran':'IR','Ireland':'IE',
+    'Israel':'IL','Italy':'IT','Japan':'JP','Jordan':'JO','Kazakhstan':'KZ',
+    'Kenya':'KE','Latvia':'LV','Lebanon':'LB','Lithuania':'LT','Luxembourg':'LU',
+    'Malaysia':'MY','Mexico':'MX','Morocco':'MA','Netherlands':'NL','New Zealand':'NZ',
+    'Nigeria':'NG','North Macedonia':'MK','Norway':'NO','Pakistan':'PK','Peru':'PE',
+    'Philippines':'PH','Poland':'PL','Portugal':'PT','Romania':'RO','Russia':'RU',
+    'Saudi Arabia':'SA','Serbia':'RS','Singapore':'SG','Slovakia':'SK',
+    'Slovenia':'SI','South Africa':'ZA','South Korea':'KR','Spain':'ES',
+    'Sri Lanka':'LK','Sweden':'SE','Switzerland':'CH','Taiwan':'TW','Thailand':'TH',
+    'Tunisia':'TN','Turkey':'TR','Türkiye':'TR','UAE':'AE',
+    'United Arab Emirates':'AE','United Kingdom':'GB','United States':'US',
+    'UK':'GB','USA':'US','Uganda':'UG','Ukraine':'UA','Uruguay':'UY',
+    'Vietnam':'VN','Zimbabwe':'ZW',
+  };
+
+  function countryFlag(name) {
+    const code = COUNTRY_CODES[name];
+    if (!code) return '';
+    return code.toUpperCase().split('').map(c =>
+      String.fromCodePoint(c.charCodeAt(0) - 65 + 0x1F1E6)
+    ).join('');
+  }
+
   function siteMatches(site) {
     const q = searchQuery.toLowerCase();
     if (q && !site.name.toLowerCase().includes(q) && !site.url.toLowerCase().includes(q)) return false;
@@ -540,17 +571,19 @@
 
   // ── Site list (left panel) ────────────────────────────────────────────────
   function buildList() {
-    const countryFilter = document.getElementById('filter-location');
-    if (countryFilter) {
+    const locationPanel = document.querySelector('#filter-location .custom-select-panel');
+    if (locationPanel) {
       const countries = [...new Set(
         SITES.map(s => getCountry(s.location)).filter(Boolean)
       )].sort();
-      countryFilter.options[0].textContent = 'All countries';
       countries.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c;
-        opt.textContent = c;
-        countryFilter.appendChild(opt);
+        const opt = document.createElement('div');
+        opt.className = 'custom-select-option';
+        opt.dataset.value = c;
+        opt.setAttribute('role', 'option');
+        const flag = countryFlag(c);
+        opt.textContent = flag ? `${flag} ${c}` : c;
+        locationPanel.appendChild(opt);
       });
     }
 
@@ -588,13 +621,46 @@
       searchQuery = e.target.value.trim();
       applyDimming();
     });
-    document.getElementById('filter-type')?.addEventListener('change', e => {
-      filterType = e.target.value;
-      applyDimming();
+  }
+
+  function initCustomSelects() {
+    document.querySelectorAll('.custom-select').forEach(select => {
+      const trigger = select.querySelector('.custom-select-trigger');
+      const panel   = select.querySelector('.custom-select-panel');
+
+      trigger.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = select.classList.contains('open');
+        document.querySelectorAll('.custom-select.open').forEach(s => {
+          s.classList.remove('open');
+          s.querySelector('.custom-select-trigger').setAttribute('aria-expanded', 'false');
+        });
+        if (!isOpen) {
+          select.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+      });
+
+      panel.addEventListener('click', e => {
+        const option = e.target.closest('.custom-select-option');
+        if (!option) return;
+        const value = option.dataset.value;
+        panel.querySelectorAll('.custom-select-option').forEach(o => o.classList.remove('selected'));
+        option.classList.add('selected');
+        trigger.querySelector('.custom-select-label').textContent = option.textContent;
+        select.classList.remove('open');
+        trigger.setAttribute('aria-expanded', 'false');
+        if (select.id === 'filter-type')     { filterType    = value; }
+        if (select.id === 'filter-location') { filterCountry = value; }
+        applyDimming();
+      });
     });
-    document.getElementById('filter-location')?.addEventListener('change', e => {
-      filterCountry = e.target.value;
-      applyDimming();
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.custom-select.open').forEach(s => {
+        s.classList.remove('open');
+        s.querySelector('.custom-select-trigger').setAttribute('aria-expanded', 'false');
+      });
     });
   }
 
@@ -602,6 +668,7 @@
   updateCounter();
   layout();
   buildList();
+  initCustomSelects();
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function makeSvgEl(tag, attrs = {}) {

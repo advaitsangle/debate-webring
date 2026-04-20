@@ -32,8 +32,8 @@ const headers = {
     const f = record.fields;
     const name        = f['Name'] || '';
     const url         = f['URL'] || '';
-    const type        = f['Content type'] || 'website';
-    const club        = f['Club / organisation'] || '';
+    const type        = f['Type'] || 'website';
+    const club        = f['Club'] || '';
     const location    = f['Location'] || '';
     const description = f['Description'] || '';
 

@@ -25,17 +25,29 @@
       <div id="search-area">
         <input id="search-input" type="text" placeholder="Search by name or url..." autocomplete="off" spellcheck="false" />
         <div id="filter-row">
-          <select id="filter-type" class="filter-select">
-            <option value="">All types</option>
-            <option value="website">Website</option>
-            <option value="newsletter">Newsletter</option>
-            <option value="youtube">YouTube</option>
-            <option value="podcast">Podcast</option>
-            <option value="other">Other</option>
-          </select>
-          <select id="filter-location" class="filter-select">
-            <option value="">All locations</option>
-          </select>
+          <div class="custom-select" id="filter-type">
+            <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span class="custom-select-label">All types</span>
+              <svg class="custom-select-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="custom-select-panel" role="listbox">
+              <div class="custom-select-option selected" data-value="" role="option">All types</div>
+              <div class="custom-select-option" data-value="website" role="option">Website</div>
+              <div class="custom-select-option" data-value="newsletter" role="option">Newsletter</div>
+              <div class="custom-select-option" data-value="youtube" role="option">YouTube</div>
+              <div class="custom-select-option" data-value="podcast" role="option">Podcast</div>
+              <div class="custom-select-option" data-value="other" role="option">Other</div>
+            </div>
+          </div>
+          <div class="custom-select" id="filter-location">
+            <button class="custom-select-trigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+              <span class="custom-select-label">All countries</span>
+              <svg class="custom-select-chevron" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="custom-select-panel" role="listbox">
+              <div class="custom-select-option selected" data-value="" role="option">All countries</div>
+            </div>
+          </div>
         </div>
       </div>
       <div id="site-list"></div>
