@@ -18,49 +18,4 @@ const SITES = [
     location: "Waterloo, Ontario, Canada",
     description: "cool blogs",
   },
-
-  {
-    name: "Alex Zhu",
-    url: "probablyalex.com",
-    type: "website",
-    club: "",
-    location: "Waterloo, Ontario, Canada",
-    description: "cool blogs",
-  },
-
-  {
-    name: "Alex Zhu",
-    url: "probablyalex.com",
-    type: "website",
-    club: "",
-    location: "Waterloo, Ontario, Canada",
-    description: "cool blogs",
-  },
-
-  {
-    name: "Alex Zhu",
-    url: "probablyalex.com",
-    type: "website",
-    club: "",
-    location: "Waterloo, Ontario, Canada",
-    description: "cool blogs",
-  },
-
-  {
-    name: "Alex Zhu",
-    url: "probablyalex.com",
-    type: "website",
-    club: "",
-    location: "Waterloo, Ontario, Canada",
-    description: "cool blogs",
-  },
-
-  {
-    name: "Alex Zhu",
-    url: "probablyalex.com",
-    type: "website",
-    club: "",
-    location: "Waterloo, Ontario, Canada",
-    description: "cool blogs",
-  },
 ];
