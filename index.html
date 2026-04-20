@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="index-page">
   <header>
     <h1><a href="index.html">debate webring</a></h1>
     <nav>
@@ -19,46 +19,65 @@
     </nav>
   </header>
 
-  <main id="ring-container">
-    <svg id="ring-svg" aria-label="Webring constellation"></svg>
-
-    <div id="zoom-hint">scroll to zoom · drag to pan</div>
-
-    <div id="info-card" class="hidden" role="complementary" aria-live="polite">
-      <div class="card-header">
-        <div class="card-name" id="card-name"></div>
-        <span class="card-type" id="card-type"></span>
-        <button class="card-close" id="card-close" aria-label="Close">×</button>
-      </div>
-      <div class="card-meta" id="card-meta"></div>
-      <div class="card-description" id="card-description"></div>
-      <div class="card-actions">
-        <a class="btn-visit" id="card-visit" href="#" target="_blank" rel="noopener">visit →</a>
-      </div>
-      <div class="card-bio">
-        <div class="card-bio-label">your webring links</div>
-        <div class="card-bio-links">
-          <a id="bio-prev" href="#">←</a>
-          <span class="bio-sep">·</span>
-          <a href="index.html">debate-webring.com</a>
-          <span class="bio-sep">·</span>
-          <a id="bio-next" href="#">→</a>
-          <button class="btn-copy" id="btn-copy" title="Copy HTML for your bio">copy</button>
+  <div id="app">
+    <!-- Left panel: search + scrollable list -->
+    <div id="left-panel">
+      <div id="search-area">
+        <input id="search-input" type="text" placeholder="Search by name or url..." autocomplete="off" spellcheck="false" />
+        <div id="filter-row">
+          <select id="filter-type" class="filter-select">
+            <option value="">All types</option>
+            <option value="website">Website</option>
+            <option value="newsletter">Newsletter</option>
+            <option value="youtube">YouTube</option>
+            <option value="podcast">Podcast</option>
+            <option value="other">Other</option>
+          </select>
+          <select id="filter-location" class="filter-select">
+            <option value="">All locations</option>
+          </select>
         </div>
       </div>
+      <div id="site-list"></div>
     </div>
 
-    <div id="ring-controls">
-      <button class="ring-nav-btn" id="prev-btn" aria-label="Previous site">← prev</button>
-      <span id="ring-counter" aria-live="polite"></span>
-      <button class="ring-nav-btn" id="next-btn" aria-label="Next site">next →</button>
-    </div>
-  </main>
+    <!-- Right panel: constellation map -->
+    <div id="right-panel">
+      <svg id="ring-svg" aria-label="Webring constellation"></svg>
 
-  <section id="directory">
-    <div class="directory-header">all sites</div>
-    <div id="directory-list"></div>
-  </section>
+      <div id="zoom-hint">scroll to zoom · drag to pan</div>
+
+      <div id="info-card" class="hidden" role="complementary" aria-live="polite">
+        <div class="card-header">
+          <div class="card-name" id="card-name"></div>
+          <span class="card-type" id="card-type"></span>
+          <button class="card-close" id="card-close" aria-label="Close">×</button>
+        </div>
+        <div class="card-meta" id="card-meta"></div>
+        <div class="card-description" id="card-description"></div>
+        <div class="card-actions">
+          <a class="btn-visit" id="card-visit" href="#" target="_blank" rel="noopener">visit →</a>
+        </div>
+        <div class="card-bio">
+          <div class="card-bio-label">your webring links</div>
+          <div class="card-bio-links">
+            <a id="bio-prev" href="#">←</a>
+            <span class="bio-sep">·</span>
+            <a href="index.html">debate-webring.com</a>
+            <span class="bio-sep">·</span>
+            <a id="bio-next" href="#">→</a>
+            <button class="btn-copy" id="btn-copy" title="Copy HTML for your bio">copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="ring-controls">
+        <button class="ring-nav-btn" id="prev-btn" aria-label="Previous site">← prev</button>
+        <span id="ring-counter" aria-live="polite"></span>
+        <button class="ring-nav-btn" id="next-btn" aria-label="Next site">next →</button>
+      </div>
+    </div>
+  </div>
 
   <script src="sites.js"></script>
   <script src="ring.js"></script>
