@@ -66,24 +66,32 @@
   svg.append(gLines, gDots, gLabels);
 
   // ── Constellation positions ───────────────────────────────────────────────
-  // Nodes roughly on a circle with organic seeded offsets — looks like a star map
   function getPositions(cx, cy, r) {
-    const rand = makePrng(0xDEBA7E); // fixed seed → same layout every load
-    return SITES.map((_, i) => {
-      const baseAngle = (i / SITES.length) * TAU - TAU / 4;
-      const angleJitter  = (rand() - 0.5) * 0.28;   // ±~8° variation
-      const radiusScale  = 0.82 + rand() * 0.36;     // 0.82–1.18× radius
-      const angle  = baseAngle + angleJitter;
-      const radius = r * radiusScale;
-      return {
-        x: cx + radius * Math.cos(angle),
-        y: cy + radius * Math.sin(angle),
-      };
-    });
+    const n = SITES.length;
+    if (n <= 15) {
+      // Ring layout with organic jitter for small counts
+      const rand = makePrng(0xDEBA7E);
+      return SITES.map((_, i) => {
+        const baseAngle   = (i / n) * TAU - TAU / 4;
+        const angleJitter = (rand() - 0.5) * 0.28;
+        const radiusScale = 0.82 + rand() * 0.36;
+        const angle  = baseAngle + angleJitter;
+        const radius = r * radiusScale;
+        return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+      });
+    } else {
+      // Phyllotaxis (golden angle) spiral — fills space evenly with no overlap
+      const golden = Math.PI * (3 - Math.sqrt(5));
+      return SITES.map((_, i) => {
+        const angle  = i * golden;
+        const radius = r * Math.sqrt((i + 0.5) / n);
+        return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+      });
+    }
   }
 
   function getRingRadius() {
-    return Math.min(window.innerWidth, window.innerHeight) * 0.31;
+    return Math.min(window.innerWidth, window.innerHeight) * 0.38;
   }
 
   // ── Build SVG elements ────────────────────────────────────────────────────
@@ -237,6 +245,27 @@
       });
     };
 
+    // Position card next to the clicked node
+    const nodeX = parseFloat(dots[i].getAttribute('cx') || window.innerWidth / 2);
+    const nodeY = parseFloat(dots[i].getAttribute('cy') || window.innerHeight / 2);
+    const cardW = Math.min(460, window.innerWidth - 32);
+    const cardH = 300;
+    const margin = 16;
+    const offset = 28;
+
+    let left = nodeX + offset;
+    if (left + cardW > window.innerWidth - margin) {
+      left = nodeX - offset - cardW;
+    }
+    left = Math.max(margin, left);
+
+    let top = nodeY - cardH / 2;
+    top = Math.max(margin + 56, Math.min(window.innerHeight - cardH - margin, top));
+
+    infoCard.style.left  = left + 'px';
+    infoCard.style.top   = top + 'px';
+    infoCard.style.bottom = 'auto';
+
     infoCard.classList.remove('hidden');
   }
 
@@ -318,9 +347,33 @@
   }
   hintTimer = setTimeout(dismissHint, 3000);
 
+  // ── Directory listing ─────────────────────────────────────────────────────
+  function buildDirectory() {
+    const list = document.getElementById('directory-list');
+    if (!list) return;
+    SITES.forEach((site, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'dir-entry';
+      const typeLabel = TYPE_LABELS[site.type] || site.type || 'website';
+      const meta = [site.club, site.location].filter(Boolean).join(' · ');
+      btn.innerHTML =
+        `<div class="dir-entry-top">` +
+          `<span class="dir-entry-name">${site.name}</span>` +
+          `<span class="dir-entry-type">${typeLabel}</span>` +
+        `</div>` +
+        `<div class="dir-entry-meta">${meta}</div>`;
+      btn.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setTimeout(() => selectSite(i), 300);
+      });
+      list.appendChild(btn);
+    });
+  }
+
   // ── Init ──────────────────────────────────────────────────────────────────
   updateCounter();
   layout();
+  buildDirectory();
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   function makeSvgEl(tag, attrs = {}) {

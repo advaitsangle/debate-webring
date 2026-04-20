@@ -3,9 +3,9 @@
   --base:    #faf4ed;
   --surface: #fffaf3;
   --overlay: #f2e9e1;
-  --muted:   #9893a5;
-  --subtle:  #797593;
-  --text:    #464261;
+  --muted:   #6e6a86;
+  --subtle:  #524c6d;
+  --text:    #3a3657;
   --love:    #b4637a;
   --gold:    #ea9d34;
   --pine:    #286983;
@@ -22,11 +22,10 @@
 }
 
 html, body {
-  height: 100%;
   background: var(--base);
   color: var(--text);
   font-family: 'Crimson Pro', Georgia, serif;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -81,7 +80,7 @@ header nav a.active {
 /* ── Ring page ── */
 #ring-container {
   width: 100vw;
-  height: 100vh;
+  height: 100svh;
   overflow: hidden;
   position: relative;
 }
@@ -128,8 +127,8 @@ header nav a.active {
 
 .ring-label {
   font-family: 'Crimson Pro', Georgia, serif;
-  font-size: 11.5px;
-  fill: var(--muted);
+  font-size: 13.5px;
+  fill: var(--subtle);
   cursor: pointer;
   transition: fill 0.15s;
   user-select: none;
@@ -149,24 +148,20 @@ header nav a.active {
 /* ── Info card ── */
 #info-card {
   position: fixed;
-  bottom: 5.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(400px, calc(100vw - 2rem));
+  width: min(460px, calc(100vw - 2rem));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1.4rem 1.6rem 1.25rem;
   z-index: 50;
   opacity: 1;
-  transition: opacity 0.2s, transform 0.2s;
-  box-shadow: 0 1px 20px rgba(70, 66, 97, 0.05);
+  transition: opacity 0.2s;
+  box-shadow: 0 2px 24px rgba(70, 66, 97, 0.1);
 }
 
 #info-card.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-50%) translateY(6px);
 }
 
 .card-header {
@@ -381,7 +376,7 @@ header nav a.active {
 }
 
 .editorial-content {
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
   padding: 7.5rem 2rem 5rem;
 }
@@ -473,33 +468,77 @@ header nav a.active {
   margin: 2.5rem 0;
 }
 
-/* ── Difference callouts (about page) ── */
-.callout-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin: 1.25rem 0 0.5rem;
+/* ── Directory listing (index page) ── */
+#directory {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 3rem 2rem 5rem;
 }
 
-.callout {
-  background: var(--overlay);
-  border-radius: 3px;
-  padding: 1rem 1.1rem;
-}
-
-.callout .callout-label {
+.directory-header {
   font-size: 0.72rem;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
-  margin-bottom: 0.4rem;
+  margin-bottom: 1.5rem;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.callout p {
-  font-size: 0.92rem;
-  color: var(--subtle);
-  margin-bottom: 0;
-  line-height: 1.55;
+#directory-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0.65rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.dir-entry {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  background: var(--base);
+  text-align: left;
+}
+
+.dir-entry:hover {
+  border-color: var(--love);
+  background: var(--overlay);
+}
+
+.dir-entry-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.2rem;
+}
+
+.dir-entry-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dir-entry-type {
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0.1em 0.4em;
+  border-radius: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.dir-entry-meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  font-style: italic;
 }
 
 /* ── Join form embed ── */
@@ -546,7 +585,6 @@ header nav a.active {
   }
 
   #info-card {
-    bottom: 5.5rem;
     padding: 1.1rem 1.25rem 1rem;
   }
 
@@ -554,7 +592,7 @@ header nav a.active {
     padding: 6rem 1.25rem 4rem;
   }
 
-  .callout-grid {
+  #directory-list {
     grid-template-columns: 1fr;
   }
 }
