@@ -9,4 +9,13 @@ const SITES = [
     location: "Waterloo, Canada",
     description: "Personal website: cybersecurity + debate + fun stuff.",
   }
+
+  {
+    name: "Alex Zhu",
+    url: "probablyalex.com",
+    type: "website",
+    club: "",
+    location: "Waterloo, Ontario, Canada",
+    description: "cool blogs",
+  },
 ];
