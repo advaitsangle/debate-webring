@@ -102,8 +102,8 @@ body.index-page header {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--border);
   overflow: hidden;
+  border-right: 1px solid var(--border);
 }
 
 #search-area {
@@ -158,6 +158,11 @@ body.index-page header {
 #site-list {
   overflow-y: auto;
   flex: 1;
+  scrollbar-width: none;
+}
+
+#site-list::-webkit-scrollbar {
+  display: none;
 }
 
 .site-row {
@@ -205,6 +210,14 @@ body.index-page header {
   flex-shrink: 0;
 }
 
+/* ── Type color coding — solid fills ── */
+.type-website    { background: var(--pine); color: var(--surface); border-color: var(--pine); }
+.type-newsletter { background: var(--gold); color: var(--surface); border-color: var(--gold); }
+.type-substack   { background: var(--gold); color: var(--surface); border-color: var(--gold); }
+.type-youtube    { background: var(--rose); color: var(--surface); border-color: var(--rose); }
+.type-podcast    { background: var(--iris); color: var(--surface); border-color: var(--iris); }
+.type-other      { background: var(--foam); color: var(--surface); border-color: var(--foam); }
+
 .site-row-sub {
   display: flex;
   align-items: baseline;
@@ -241,6 +254,8 @@ body.index-page header {
   position: relative;
   overflow: hidden;
   min-width: 0;
+  background: var(--surface);
+  box-shadow: inset 3px 0 16px rgba(58, 54, 87, 0.05);
 }
 
 #ring-svg {
@@ -272,11 +287,21 @@ body.index-page header {
   stroke-opacity: 0.12 !important;
 }
 
+/* ── Card connector line ── */
+.card-connector {
+  stroke: var(--muted);
+  stroke-width: 0.75;
+  stroke-dasharray: 3 4;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .ring-dot {
   fill: var(--muted);
   cursor: pointer;
   transition: fill 0.15s, opacity 0.15s;
 }
+
 
 .ring-dot:hover,
 .ring-dot.hovered {
@@ -320,15 +345,15 @@ body.index-page header {
 /* ── Info card ── */
 #info-card {
   position: fixed;
-  width: min(420px, calc(58vw - 2rem));
+  width: min(300px, calc(58vw - 2rem));
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 3px;
-  padding: 1.2rem 1.4rem 1.1rem;
+  padding: 0.8rem 0.95rem 0.75rem;
   z-index: 50;
   opacity: 1;
   transition: opacity 0.2s;
-  box-shadow: 0 2px 20px rgba(58, 54, 87, 0.1);
+  box-shadow: 0 2px 16px rgba(58, 54, 87, 0.1);
 }
 
 #info-card.hidden {
@@ -338,14 +363,14 @@ body.index-page header {
 
 .card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
-  margin-bottom: 0.15rem;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 
 .card-name {
-  font-size: 1.15rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text);
   line-height: 1.2;
@@ -353,16 +378,14 @@ body.index-page header {
 }
 
 .card-type {
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-family: 'Crimson Pro', Georgia, serif;
-  color: var(--muted);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   border: 1px solid var(--border);
-  padding: 0.12em 0.45em;
+  padding: 0.1em 0.42em;
   border-radius: 2px;
   white-space: nowrap;
-  margin-top: 0.18rem;
   flex-shrink: 0;
 }
 
@@ -370,13 +393,14 @@ body.index-page header {
   background: none;
   border: none;
   color: var(--muted);
-  font-size: 1.1rem;
+  font-size: 1rem;
   cursor: pointer;
-  padding: 0.05rem 0.2rem;
+  padding: 0 0.15rem;
   line-height: 1;
   transition: color 0.15s;
   font-family: 'Crimson Pro', Georgia, serif;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .card-close:hover {
@@ -384,35 +408,34 @@ body.index-page header {
 }
 
 .card-meta {
-  font-size: 0.83rem;
+  font-size: 0.72rem;
   font-family: 'Crimson Pro', Georgia, serif;
   color: var(--muted);
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.4rem;
   font-style: italic;
 }
 
 .card-description {
-  font-size: 0.92rem;
+  font-size: 0.8rem;
   font-family: 'Crimson Pro', Georgia, serif;
   color: var(--subtle);
-  line-height: 1.52;
-  margin-bottom: 0.9rem;
+  line-height: 1.48;
+  margin-bottom: 0.65rem;
 }
 
 .card-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 0.6rem;
 }
 
 .btn-visit {
   display: inline-block;
-  padding: 0.3rem 0.9rem;
+  padding: 0.18rem 0.65rem;
   background: var(--love);
   color: var(--surface);
   font-family: 'Crimson Pro', Georgia, serif;
-  font-size: 0.88rem;
+  font-size: 0.76rem;
   font-style: italic;
   border: none;
   border-radius: 2px;
@@ -425,70 +448,6 @@ body.index-page header {
   background: var(--rose);
 }
 
-/* ── Bio links ── */
-.card-bio {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--overlay);
-}
-
-.card-bio-label {
-  font-size: 0.7rem;
-  font-family: 'Crimson Pro', Georgia, serif;
-  color: var(--muted);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  margin-bottom: 0.35rem;
-}
-
-.card-bio-links {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  font-family: 'Crimson Pro', Georgia, serif;
-  flex-wrap: wrap;
-}
-
-.card-bio-links a {
-  color: var(--subtle);
-  text-decoration: none;
-  transition: color 0.15s;
-  border-bottom: 1px solid var(--border);
-}
-
-.card-bio-links a:hover {
-  color: var(--love);
-  border-color: var(--love);
-}
-
-.bio-sep {
-  color: var(--muted);
-  font-style: normal;
-}
-
-.btn-copy {
-  font-size: 0.74rem;
-  font-family: 'Crimson Pro', Georgia, serif;
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  padding: 0.12em 0.5em;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  margin-left: auto;
-}
-
-.btn-copy:hover {
-  color: var(--text);
-  border-color: var(--subtle);
-}
-
-.btn-copy.copied {
-  color: var(--pine);
-  border-color: var(--pine);
-}
 
 /* ── Ring nav controls (inside right panel) ── */
 #ring-controls {
@@ -500,10 +459,16 @@ body.index-page header {
   align-items: center;
   gap: 1.25rem;
   z-index: 50;
-  background: var(--base);
-  padding: 0.3rem 0.75rem;
-  border: 1px solid var(--border);
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 3px;
+  padding: 0.3rem 0.75rem;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+#ring-controls.has-selection {
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .ring-nav-btn {
@@ -515,7 +480,14 @@ body.index-page header {
   font-style: italic;
   padding: 0.18rem 0.4rem;
   cursor: pointer;
-  transition: color 0.15s;
+  transition: color 0.15s, opacity 0.2s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#ring-controls.has-selection .ring-nav-btn {
+  opacity: 1;
+  pointer-events: all;
 }
 
 .ring-nav-btn:hover {
@@ -523,29 +495,51 @@ body.index-page header {
 }
 
 #ring-counter {
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-family: 'Crimson Pro', Georgia, serif;
-  color: var(--muted);
-  font-style: italic;
+  color: var(--subtle);
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 0.08rem 0.65rem;
   min-width: 4rem;
   text-align: center;
+  letter-spacing: 0.02em;
 }
 
 /* ── Zoom hint ── */
 #zoom-hint {
   position: absolute;
-  top: 1.25rem;
+  top: 1rem;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   pointer-events: none;
   opacity: 1;
   transition: opacity 1.2s;
   z-index: 10;
-  letter-spacing: 0.02em;
   white-space: nowrap;
+}
+
+#zoom-hint .hint-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.68rem;
+  font-family: 'Crimson Pro', Georgia, serif;
+  color: var(--subtle);
+  line-height: 1.5;
+}
+
+#zoom-hint .hint-sep {
+  font-size: 0.6rem;
+  color: var(--border);
 }
 
 #zoom-hint.fade {
