@@ -46,9 +46,12 @@
   const svg      = document.getElementById('ring-svg');
   const infoCard = document.getElementById('info-card');
   const counter  = document.getElementById('ring-counter');
+  const controls = document.getElementById('ring-controls');
   const zoomHint = document.getElementById('zoom-hint');
   const NS  = 'http://www.w3.org/2000/svg';
   const TAU = Math.PI * 2;
+
+  const BASE = window.location.href.split('#')[0].replace(/\/?$/, '');
 
   let scale = 1;
   let panX  = 0;
@@ -57,40 +60,122 @@
   let isDragging  = false;
   let dragStart   = { x: 0, y: 0, panX: 0, panY: 0 };
   let hintTimer;
+  let panRafId = null;
 
   // Filter state
-  let searchQuery    = '';
-  let filterType     = '';
-  let filterLocation = '';
+  let searchQuery   = '';
+  let filterType    = '';
+  let filterCountry = '';
 
-  // SVG layers: lines → dots → labels
-  const gLines  = makeSvgEl('g');
-  const gDots   = makeSvgEl('g');
-  const gLabels = makeSvgEl('g');
-  svg.append(gLines, gDots, gLabels);
+  // ── SVG layers: lines → dots → labels → connector ─────────────────────────
+  const gLines     = makeSvgEl('g');
+  const gDots      = makeSvgEl('g');
+  const gLabels    = makeSvgEl('g');
+  const gConnector = makeSvgEl('g');
+  svg.append(gLines, gDots, gLabels, gConnector);
 
-  // ── Constellation positions ───────────────────────────────────────────────
-  function getPositions(cx, cy, r) {
-    const n = SITES.length;
-    if (n <= 15) {
-      const rand = makePrng(0xDEBA7E);
-      return SITES.map((_, i) => {
-        const baseAngle   = (i / n) * TAU - TAU / 4;
-        const angleJitter = (rand() - 0.5) * 0.28;
-        const radiusScale = 0.82 + rand() * 0.36;
-        const angle  = baseAngle + angleJitter;
-        const radius = r * radiusScale;
-        return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
-      });
-    } else {
-      // Phyllotaxis (golden angle) — fills space evenly, no empty centre
-      const golden = Math.PI * (3 - Math.sqrt(5));
-      return SITES.map((_, i) => {
-        const angle  = i * golden;
-        const radius = r * Math.sqrt((i + 0.5) / n);
-        return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
-      });
+  // Single connector line from selected node to card
+  const connLine = makeSvgEl('line', { class: 'card-connector' });
+  connLine.style.display = 'none';
+  gConnector.appendChild(connLine);
+
+  // ── Force-directed layout — runs once, result cached forever ─────────────
+  // Uses seeded random starting positions + Fruchterman-Reingold forces.
+  // Returns normalised coords in [-1, 1] space; getPositions scales to actual r.
+  let _cachedLayout = null;
+
+  function computeLayout() {
+    const n    = SITES.length;
+    const rand = makePrng(0xDEBA7F);
+
+    // Seeded random start — uniform distribution inside unit disc
+    const px = new Float32Array(n);
+    const py = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const a    = rand() * TAU;
+      const dist = Math.sqrt(rand()) * 0.82;
+      px[i] = dist * Math.cos(a);
+      py[i] = dist * Math.sin(a);
     }
+
+    // Repulsion-only layout: nodes spread into an organic cloud (no ring attraction)
+    const k    = Math.sqrt(Math.PI / n) * 1.35;
+    const ITER = 120;
+
+    for (let it = 0; it < ITER; it++) {
+      const fx = new Float32Array(n);
+      const fy = new Float32Array(n);
+
+      // Repulsion between every pair
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const dx = px[i] - px[j];
+          const dy = py[i] - py[j];
+          const d  = Math.sqrt(dx * dx + dy * dy) || 1e-4;
+          const f  = (k * k) / d;
+          fx[i] += (dx / d) * f;  fy[i] += (dy / d) * f;
+          fx[j] -= (dx / d) * f;  fy[j] -= (dy / d) * f;
+        }
+      }
+
+      // Soft center pull keeps the cloud from flying apart
+      for (let i = 0; i < n; i++) {
+        fx[i] -= px[i] * 0.07;
+        fy[i] -= py[i] * 0.07;
+      }
+
+      const temp = 0.12 * (1 - it / ITER);
+      for (let i = 0; i < n; i++) {
+        const mag  = Math.sqrt(fx[i] * fx[i] + fy[i] * fy[i]) || 1;
+        const disp = Math.min(mag, temp);
+        px[i] += (fx[i] / mag) * disp;
+        py[i] += (fy[i] / mag) * disp;
+      }
+    }
+
+    // Nearest-neighbour TSP: reorder positions so consecutive ring nodes land close
+    const visited = new Uint8Array(n);
+    const order   = new Int32Array(n);
+    order[0]      = 0;
+    visited[0]    = 1;
+    for (let step = 1; step < n; step++) {
+      const cur = order[step - 1];
+      let best = -1, bestD = Infinity;
+      for (let j = 0; j < n; j++) {
+        if (visited[j]) continue;
+        const dx = px[cur] - px[j], dy = py[cur] - py[j];
+        const d  = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = j; }
+      }
+      order[step]   = best;
+      visited[best] = 1;
+    }
+
+    // Normalize so the outermost node sits at exactly radius 0.85 — makes the
+    // radius multiplier in getPositions a reliable fraction of the panel size.
+    let maxR = 0;
+    for (let i = 0; i < n; i++) {
+      const d = Math.sqrt(px[order[i]] * px[order[i]] + py[order[i]] * py[order[i]]);
+      if (d > maxR) maxR = d;
+    }
+    const norm = 0.85 / (maxR || 1);
+
+    // Ring node i gets the position at order[i]
+    return Array.from({ length: n }, (_, i) => ({ x: px[order[i]] * norm, y: py[order[i]] * norm }));
+  }
+
+  // At scale=1 the outermost node (at normalised radius 0.85) sits exactly
+  // min(w,h)/2 - NODE_PAD pixels from centre — no guesswork multiplier needed.
+  const NODE_PAD = 56; // pixels of breathing room for labels at fit-view
+
+  function fitRadius(w, h) {
+    return (Math.min(w, h) / 2 - NODE_PAD) / 0.85;
+  }
+
+  function getPositions(cx, cy, w, h) {
+    if (!_cachedLayout) _cachedLayout = computeLayout();
+    const r = fitRadius(w, h) * scale;
+    return _cachedLayout.map(p => ({ x: cx + p.x * r, y: cy + p.y * r }));
   }
 
   // ── Build SVG elements ────────────────────────────────────────────────────
@@ -105,7 +190,7 @@
     lines.push(line);
 
     const dot = makeSvgEl('circle', { class: 'ring-dot', r: 4 });
-    dot.addEventListener('click',      () => selectSite(i));
+    dot.addEventListener('click',      () => selectSite(i, false));
     dot.addEventListener('mouseenter', () => hoverSite(i, true));
     dot.addEventListener('mouseleave', () => hoverSite(i, false));
     gDots.appendChild(dot);
@@ -113,7 +198,7 @@
 
     const label = makeSvgEl('text', { class: 'ring-label' });
     label.textContent = site.name.split(' ')[0];
-    label.addEventListener('click',      () => selectSite(i));
+    label.addEventListener('click',      () => selectSite(i, false));
     label.addEventListener('mouseenter', () => hoverSite(i, true));
     label.addEventListener('mouseleave', () => hoverSite(i, false));
     gLabels.appendChild(label);
@@ -121,14 +206,19 @@
   });
 
   // ── Layout ────────────────────────────────────────────────────────────────
+  function getSvgSize() {
+    const r = svg.getBoundingClientRect();
+    return {
+      w: r.width  || svg.clientWidth  || window.innerWidth  * 0.58,
+      h: r.height || svg.clientHeight || window.innerHeight,
+    };
+  }
+
   function layout() {
-    const svgRect = svg.getBoundingClientRect();
-    const w = svgRect.width  || svg.clientWidth  || window.innerWidth  * 0.58;
-    const h = svgRect.height || svg.clientHeight || window.innerHeight;
+    const { w, h } = getSvgSize();
     const cx = w / 2 + panX;
     const cy = h / 2 + panY;
-    const r  = Math.min(w, h) * 0.38 * scale;
-    const pos = getPositions(cx, cy, r);
+    const pos = getPositions(cx, cy, w, h);
     const n = SITES.length;
 
     pos.forEach((p, i) => {
@@ -157,19 +247,60 @@
       else if (dx < -15) labels[i].setAttribute('text-anchor', 'end');
       else               labels[i].setAttribute('text-anchor', 'middle');
     });
+
+    // Card and connector track the selected node during pan/zoom
+    if (selectedIdx !== -1 && !infoCard.classList.contains('hidden')) {
+      repositionCard(selectedIdx);
+    }
+  }
+
+  // ── Animated pan to centre a node ────────────────────────────────────────
+  function animatePanTo(targetX, targetY, onDone) {
+    if (panRafId) cancelAnimationFrame(panRafId);
+    const startX = panX, startY = panY;
+    const dx = targetX - startX, dy = targetY - startY;
+    const duration = 650;
+    const startTime = performance.now();
+
+    function step(now) {
+      const t    = Math.min(1, (now - startTime) / duration);
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      panX = startX + dx * ease;
+      panY = startY + dy * ease;
+      layout();
+      if (t < 1) {
+        panRafId = requestAnimationFrame(step);
+      } else {
+        panRafId = null;
+        if (onDone) onDone();
+      }
+    }
+    panRafId = requestAnimationFrame(step);
+  }
+
+  function centerOnNode(i, onDone) {
+    const { w, h } = getSvgSize();
+    const natural = getPositions(w / 2, h / 2, w, h);
+    animatePanTo(w / 2 - natural[i].x, h / 2 - natural[i].y, onDone);
   }
 
   // ── Selection ─────────────────────────────────────────────────────────────
-  function selectSite(i) {
+  function selectSite(i, animateToNode) {
     selectedIdx = i;
     dots.forEach((d, j)     => d.classList.toggle('selected', j === i));
     labels.forEach((l, j)   => l.classList.toggle('selected', j === i));
     siteRows.forEach((r, j) => r.classList.toggle('active', j === i));
     updateLines();
     updateCounter();
-    layout();
-    showCard(i);
+    applyDimming();
     siteRows[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    if (animateToNode) {
+      centerOnNode(i, () => showCard(i));
+    } else {
+      layout();
+      showCard(i);
+    }
   }
 
   function hoverSite(i, on) {
@@ -191,6 +322,36 @@
     counter.textContent = selectedIdx === -1
       ? `${SITES.length} sites`
       : `${selectedIdx + 1} / ${SITES.length}`;
+    controls.classList.toggle('has-selection', selectedIdx !== -1);
+  }
+
+  // ── Dimming: selection mode greys all but selected+neighbours ─────────────
+  function computeVisible() {
+    const n = SITES.length;
+    if (selectedIdx !== -1) {
+      const sel = new Set([
+        selectedIdx,
+        (selectedIdx - 1 + n) % n,
+        (selectedIdx + 1) % n,
+      ]);
+      return SITES.map((_, i) => sel.has(i));
+    }
+    // No selection — apply filter
+    const anyFilter = searchQuery || filterType || filterCountry;
+    if (!anyFilter) return SITES.map(() => true);
+    const matched = new Set(
+      SITES.map((s, i) => siteMatches(s) ? i : -1).filter(i => i !== -1)
+    );
+    return SITES.map((_, i) => matched.has(i));
+  }
+
+  function applyDimming() {
+    const n = SITES.length;
+    const vis = computeVisible();
+    dots.forEach((d, i)     => d.classList.toggle('dimmed', !vis[i]));
+    labels.forEach((l, i)   => l.classList.toggle('dimmed', !vis[i]));
+    lines.forEach((l, i)    => l.classList.toggle('dimmed', !vis[i] || !vis[(i + 1) % n]));
+    siteRows.forEach((r, i) => r.classList.toggle('dimmed', !vis[i]));
   }
 
   // ── Info card ─────────────────────────────────────────────────────────────
@@ -203,13 +364,70 @@
     other:      'content',
   };
 
+  const TYPE_CLASS = {
+    website:    'type-website',
+    newsletter: 'type-newsletter',
+    substack:   'type-newsletter',
+    youtube:    'type-youtube',
+    podcast:    'type-podcast',
+    other:      'type-other',
+  };
+
+  // Positions the card above/below the node and updates the connector line
+  function repositionCard(i) {
+    const svgRect = svg.getBoundingClientRect();
+    const dotCx = parseFloat(dots[i].getAttribute('cx') || '0');
+    const dotCy = parseFloat(dots[i].getAttribute('cy') || '0');
+    const nodeX = svgRect.left + dotCx;
+    const nodeY = svgRect.top  + dotCy;
+
+    const cW         = Math.min(300, svgRect.width - 24);
+    const cH         = 220;
+    const margin     = 12;
+    const nodeR      = 24; // clearance beyond the selected dot radius
+    const bottomSafe = window.innerHeight - 90;
+
+    // Card must be entirely above or below the node — never overlapping it
+    const spaceAbove = nodeY - svgRect.top - margin;
+    const spaceBelow = bottomSafe - nodeY - margin;
+
+    let top;
+    if (spaceAbove >= cH + nodeR || spaceAbove >= spaceBelow) {
+      // Place card above: bottom edge = nodeY - nodeR
+      top = Math.max(svgRect.top + margin, nodeY - nodeR - cH);
+    } else {
+      // Place card below: top edge = nodeY + nodeR
+      top = Math.min(bottomSafe - cH, nodeY + nodeR);
+    }
+
+    let left = nodeX - cW / 2;
+    left = Math.max(svgRect.left + margin, Math.min(window.innerWidth - cW - margin, left));
+
+    infoCard.style.left   = left + 'px';
+    infoCard.style.top    = top  + 'px';
+    infoCard.style.bottom = 'auto';
+
+    // Connector line in SVG coordinates
+    const cardCenterSvgX = (left - svgRect.left) + cW / 2;
+    const isAbove = top < nodeY - svgRect.top;
+    // Connect dot to the nearest horizontal edge of the card
+    const connY2 = isAbove ? (top - svgRect.top + cH) : (top - svgRect.top);
+
+    connLine.setAttribute('x1', dotCx);
+    connLine.setAttribute('y1', dotCy);
+    connLine.setAttribute('x2', cardCenterSvgX);
+    connLine.setAttribute('y2', connY2);
+    connLine.style.display = '';
+  }
+
   function showCard(i) {
     const site = SITES[i];
-    const n = SITES.length;
 
     document.getElementById('card-name').textContent = site.name;
-    document.getElementById('card-type').textContent =
-      TYPE_LABELS[site.type] || site.type || 'website';
+
+    const typeEl = document.getElementById('card-type');
+    typeEl.textContent = TYPE_LABELS[site.type] || site.type || 'website';
+    typeEl.className   = `card-type ${TYPE_CLASS[site.type] || ''}`;
 
     const parts = [site.club, site.location].filter(Boolean);
     document.getElementById('card-meta').textContent = parts.join(' · ');
@@ -220,62 +438,20 @@
     const hostname = (() => { try { return new URL(site.url).hostname; } catch { return site.url; } })();
     visitLink.textContent = `visit ${hostname} →`;
 
-    const BASE = 'https://debate-webring.com';
-    const domain = hostname;
-    document.getElementById('bio-prev').href = `${BASE}/#${domain}?nav=prev`;
-    document.getElementById('bio-next').href = `${BASE}/#${domain}?nav=next`;
-
-    const copyBtn = document.getElementById('btn-copy');
-    copyBtn.textContent = 'copy';
-    copyBtn.classList.remove('copied');
-    copyBtn.onclick = () => {
-      const html =
-        `<a href="${BASE}/#${domain}?nav=prev">←</a> ` +
-        `<a href="${BASE}">${BASE}</a> ` +
-        `<a href="${BASE}/#${domain}?nav=next">→</a>`;
-      navigator.clipboard.writeText(html).then(() => {
-        copyBtn.textContent = 'copied';
-        copyBtn.classList.add('copied');
-        setTimeout(() => {
-          copyBtn.textContent = 'copy';
-          copyBtn.classList.remove('copied');
-        }, 2000);
-      });
-    };
-
-    // Position card next to the clicked node, avoiding the controls at bottom
-    const svgRect    = svg.getBoundingClientRect();
-    const nodeX      = svgRect.left + parseFloat(dots[i].getAttribute('cx') || '0');
-    const nodeY      = svgRect.top  + parseFloat(dots[i].getAttribute('cy') || '0');
-    const cardW      = Math.min(420, svgRect.width - 24);
-    const cardH      = 290;
-    const margin     = 12;
-    const offset     = 22;
-    const bottomSafe = window.innerHeight - 90; // clear the controls bar
-
-    let left = nodeX + offset;
-    if (left + cardW > window.innerWidth - margin) {
-      left = nodeX - offset - cardW;
-    }
-    left = Math.max(svgRect.left + margin, left);
-
-    let top = nodeY - cardH / 2;
-    top = Math.max(svgRect.top + margin, Math.min(bottomSafe - cardH, top));
-
-    infoCard.style.left   = left + 'px';
-    infoCard.style.top    = top + 'px';
-    infoCard.style.bottom = 'auto';
+    repositionCard(i);
     infoCard.classList.remove('hidden');
   }
 
   function hideCard() {
     infoCard.classList.add('hidden');
+    connLine.style.display = 'none';
     selectedIdx = -1;
     dots.forEach((d)     => { d.classList.remove('selected'); d.setAttribute('r', 4); });
     labels.forEach((l)   => l.classList.remove('selected'));
     siteRows.forEach((r) => r.classList.remove('active'));
     updateLines();
     updateCounter();
+    applyDimming();
     layout();
   }
 
@@ -284,18 +460,18 @@
   // ── Prev / Next buttons ───────────────────────────────────────────────────
   document.getElementById('prev-btn').addEventListener('click', () => {
     const n = SITES.length;
-    selectSite(selectedIdx === -1 ? n - 1 : (selectedIdx - 1 + n) % n);
+    selectSite(selectedIdx === -1 ? n - 1 : (selectedIdx - 1 + n) % n, false);
   });
 
   document.getElementById('next-btn').addEventListener('click', () => {
     const n = SITES.length;
-    selectSite(selectedIdx === -1 ? 0 : (selectedIdx + 1) % n);
+    selectSite(selectedIdx === -1 ? 0 : (selectedIdx + 1) % n, false);
   });
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
-    scale = Math.max(0.3, Math.min(5, scale * (e.deltaY < 0 ? 1.1 : 0.91)));
+    scale = Math.max(0.05, Math.min(5, scale * (e.deltaY < 0 ? 1.1 : 0.91)));
     layout();
     dismissHint();
   }, { passive: false });
@@ -303,6 +479,7 @@
   // ── Pan ───────────────────────────────────────────────────────────────────
   svg.addEventListener('mousedown', (e) => {
     if (e.button !== 0) return;
+    if (panRafId) { cancelAnimationFrame(panRafId); panRafId = null; }
     isDragging = true;
     dragStart  = { x: e.clientX, y: e.clientY, panX, panY };
     svg.style.cursor = 'grabbing';
@@ -347,38 +524,33 @@
   hintTimer = setTimeout(dismissHint, 3000);
 
   // ── Filter / Search ───────────────────────────────────────────────────────
+  function getCountry(loc) {
+    if (!loc) return '';
+    const parts = loc.split(',');
+    return parts[parts.length - 1].trim();
+  }
+
   function siteMatches(site) {
     const q = searchQuery.toLowerCase();
     if (q && !site.name.toLowerCase().includes(q) && !site.url.toLowerCase().includes(q)) return false;
     if (filterType && site.type !== filterType) return false;
-    if (filterLocation && site.location !== filterLocation) return false;
+    if (filterCountry && getCountry(site.location) !== filterCountry) return false;
     return true;
-  }
-
-  function applyFilter() {
-    const n = SITES.length;
-    const matched = new Set(
-      SITES.map((s, i) => siteMatches(s) ? i : -1).filter(i => i !== -1)
-    );
-    dots.forEach((d, i)    => d.classList.toggle('dimmed', !matched.has(i)));
-    labels.forEach((l, i)  => l.classList.toggle('dimmed', !matched.has(i)));
-    lines.forEach((l, i)   => l.classList.toggle('dimmed',
-      !matched.has(i) || !matched.has((i + 1) % n)
-    ));
-    siteRows.forEach((r, i) => r.classList.toggle('dimmed', !matched.has(i)));
   }
 
   // ── Site list (left panel) ────────────────────────────────────────────────
   function buildList() {
-    // Populate location filter from SITES data
-    const locFilter = document.getElementById('filter-location');
-    if (locFilter) {
-      const locs = [...new Set(SITES.map(s => s.location).filter(Boolean))].sort();
-      locs.forEach(loc => {
+    const countryFilter = document.getElementById('filter-location');
+    if (countryFilter) {
+      const countries = [...new Set(
+        SITES.map(s => getCountry(s.location)).filter(Boolean)
+      )].sort();
+      countryFilter.options[0].textContent = 'All countries';
+      countries.forEach(c => {
         const opt = document.createElement('option');
-        opt.value = loc;
-        opt.textContent = loc;
-        locFilter.appendChild(opt);
+        opt.value = c;
+        opt.textContent = c;
+        countryFilter.appendChild(opt);
       });
     }
 
@@ -389,13 +561,14 @@
       const row = document.createElement('div');
       row.className = 'site-row';
       const typeLabel = TYPE_LABELS[site.type] || site.type || 'website';
+      const typeClass = TYPE_CLASS[site.type] || '';
       const meta = [site.club, site.location].filter(Boolean).join(' · ');
       const hostname = (() => { try { return new URL(site.url).hostname; } catch { return site.url; } })();
 
       row.innerHTML =
         `<div class="site-row-main">` +
           `<span class="site-row-name">${site.name}</span>` +
-          `<span class="site-row-type">${typeLabel}</span>` +
+          `<span class="site-row-type ${typeClass}">${typeLabel}</span>` +
         `</div>` +
         `<div class="site-row-sub">` +
           `<span class="site-row-location">${meta}</span>` +
@@ -404,25 +577,24 @@
 
       row.addEventListener('click', (e) => {
         if (e.target.classList.contains('site-row-url')) return;
-        selectSite(i);
+        selectSite(i, true);
       });
 
       list.appendChild(row);
       siteRows.push(row);
     });
 
-    // Wire up search + filter controls
     document.getElementById('search-input')?.addEventListener('input', e => {
       searchQuery = e.target.value.trim();
-      applyFilter();
+      applyDimming();
     });
     document.getElementById('filter-type')?.addEventListener('change', e => {
       filterType = e.target.value;
-      applyFilter();
+      applyDimming();
     });
     document.getElementById('filter-location')?.addEventListener('change', e => {
-      filterLocation = e.target.value;
-      applyFilter();
+      filterCountry = e.target.value;
+      applyDimming();
     });
   }
 
