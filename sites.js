@@ -8,7 +8,7 @@ const SITES = [
     club: "University of Waterloo Debating Society",
     location: "Waterloo, Canada",
     description: "Personal website: cybersecurity + debate + fun stuff.",
-  }
+  },
 
   {
     name: "Alex Zhu",
