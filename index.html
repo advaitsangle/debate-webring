@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debate Webring</title>
+  <meta name="description" content="A global webring connecting competitive debaters and the things they make." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1><a href="index.html">debate webring</a></h1>
+    <nav>
+      <a href="about.html">about</a>
+      <a href="join.html">join</a>
+    </nav>
+  </header>
+
+  <main id="ring-container">
+    <svg id="ring-svg" aria-label="Webring constellation"></svg>
+
+    <div id="zoom-hint">scroll to zoom · drag to pan</div>
+
+    <div id="info-card" class="hidden" role="complementary" aria-live="polite">
+      <div class="card-header">
+        <div class="card-name" id="card-name"></div>
+        <span class="card-type" id="card-type"></span>
+        <button class="card-close" id="card-close" aria-label="Close">×</button>
+      </div>
+      <div class="card-meta" id="card-meta"></div>
+      <div class="card-description" id="card-description"></div>
+      <div class="card-actions">
+        <a class="btn-visit" id="card-visit" href="#" target="_blank" rel="noopener">visit →</a>
+      </div>
+      <div class="card-bio">
+        <div class="card-bio-label">your webring links</div>
+        <div class="card-bio-links">
+          <a id="bio-prev" href="#">←</a>
+          <span class="bio-sep">·</span>
+          <a href="index.html">debate-webring.com</a>
+          <span class="bio-sep">·</span>
+          <a id="bio-next" href="#">→</a>
+          <button class="btn-copy" id="btn-copy" title="Copy HTML for your bio">copy</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="ring-controls">
+      <button class="ring-nav-btn" id="prev-btn" aria-label="Previous site">← prev</button>
+      <span id="ring-counter" aria-live="polite"></span>
+      <button class="ring-nav-btn" id="next-btn" aria-label="Next site">next →</button>
+    </div>
+  </main>
+
+  <script src="sites.js"></script>
+  <script src="ring.js"></script>
+</body>
+</html>

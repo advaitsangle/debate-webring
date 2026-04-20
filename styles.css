@@ -1,0 +1,560 @@
+/* ── Rose Pine Dawn palette ── */
+:root {
+  --base:    #faf4ed;
+  --surface: #fffaf3;
+  --overlay: #f2e9e1;
+  --muted:   #9893a5;
+  --subtle:  #797593;
+  --text:    #464261;
+  --love:    #b4637a;
+  --gold:    #ea9d34;
+  --pine:    #286983;
+  --foam:    #56949f;
+  --iris:    #907aa9;
+  --rose:    #d7827e;
+  --border:  #e4ddd6;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--base);
+  color: var(--text);
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 18px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header ── */
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  pointer-events: none;
+}
+
+header h1 {
+  font-size: 1rem;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  pointer-events: all;
+}
+
+header h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+header nav {
+  display: flex;
+  gap: 1.5rem;
+  pointer-events: all;
+}
+
+header nav a {
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: color 0.15s;
+}
+
+header nav a:hover,
+header nav a.active {
+  color: var(--love);
+}
+
+/* ── Ring page ── */
+#ring-container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+#ring-svg {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  display: block;
+}
+
+#ring-svg:active {
+  cursor: grabbing;
+}
+
+/* ── Constellation elements ── */
+.ring-line {
+  stroke: var(--border);
+  stroke-width: 0.75;
+  fill: none;
+  transition: stroke 0.25s, stroke-opacity 0.25s;
+  stroke-opacity: 0.7;
+}
+
+.ring-line.active {
+  stroke: var(--love);
+  stroke-opacity: 0.45;
+}
+
+.ring-dot {
+  fill: var(--muted);
+  cursor: pointer;
+  transition: fill 0.15s;
+}
+
+.ring-dot:hover,
+.ring-dot.hovered {
+  fill: var(--love);
+}
+
+.ring-dot.selected {
+  fill: var(--love);
+}
+
+.ring-label {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 11.5px;
+  fill: var(--muted);
+  cursor: pointer;
+  transition: fill 0.15s;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+.ring-label:hover,
+.ring-label.hovered {
+  fill: var(--love);
+}
+
+.ring-label.selected {
+  fill: var(--subtle);
+  font-style: italic;
+}
+
+/* ── Info card ── */
+#info-card {
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(400px, calc(100vw - 2rem));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1.4rem 1.6rem 1.25rem;
+  z-index: 50;
+  opacity: 1;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 1px 20px rgba(70, 66, 97, 0.05);
+}
+
+#info-card.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(6px);
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.2rem;
+}
+
+.card-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.card-type {
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+  padding: 0.15em 0.5em;
+  border-radius: 2px;
+  white-space: nowrap;
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.card-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  line-height: 1;
+  transition: color 0.15s;
+  font-family: 'Crimson Pro', Georgia, serif;
+  flex-shrink: 0;
+}
+
+.card-close:hover {
+  color: var(--text);
+}
+
+.card-meta {
+  font-size: 0.88rem;
+  color: var(--muted);
+  margin-bottom: 0.65rem;
+  font-style: italic;
+}
+
+.card-description {
+  font-size: 0.97rem;
+  color: var(--subtle);
+  line-height: 1.55;
+  margin-bottom: 1rem;
+}
+
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn-visit {
+  display: inline-block;
+  padding: 0.35rem 1rem;
+  background: var(--love);
+  color: var(--surface);
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 0.9rem;
+  font-style: italic;
+  border: none;
+  border-radius: 2px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-visit:hover {
+  background: var(--rose);
+}
+
+/* ── Bio links ── */
+.card-bio {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--overlay);
+}
+
+.card-bio-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: 0.4rem;
+}
+
+.card-bio-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  flex-wrap: wrap;
+}
+
+.card-bio-links a {
+  color: var(--subtle);
+  text-decoration: none;
+  transition: color 0.15s;
+  border-bottom: 1px solid var(--border);
+}
+
+.card-bio-links a:hover {
+  color: var(--love);
+  border-color: var(--love);
+}
+
+.bio-sep {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.btn-copy {
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  padding: 0.15em 0.55em;
+  cursor: pointer;
+  font-family: 'Crimson Pro', Georgia, serif;
+  transition: color 0.15s, border-color 0.15s;
+  margin-left: auto;
+}
+
+.btn-copy:hover {
+  color: var(--text);
+  border-color: var(--subtle);
+}
+
+.btn-copy.copied {
+  color: var(--pine);
+  border-color: var(--pine);
+}
+
+/* ── Ring nav controls ── */
+#ring-controls {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  z-index: 50;
+}
+
+.ring-nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 0.9rem;
+  font-style: italic;
+  padding: 0.28rem 0.85rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ring-nav-btn:hover {
+  border-color: var(--love);
+  color: var(--love);
+}
+
+#ring-counter {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+  min-width: 4.5rem;
+  text-align: center;
+}
+
+/* ── Zoom hint ── */
+#zoom-hint {
+  position: fixed;
+  top: 4.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: var(--muted);
+  font-style: italic;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 1.2s;
+  z-index: 10;
+  letter-spacing: 0.02em;
+}
+
+#zoom-hint.fade {
+  opacity: 0;
+}
+
+/* ── Editorial pages (about, join) ── */
+.editorial-page {
+  min-height: 100vh;
+}
+
+.editorial-content {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 7.5rem 2rem 5rem;
+}
+
+.editorial-content h2 {
+  font-size: 2rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--text);
+  margin-bottom: 0.35rem;
+  line-height: 1.2;
+}
+
+.editorial-content .lede {
+  font-size: 1.05rem;
+  color: var(--subtle);
+  margin-bottom: 2.5rem;
+  line-height: 1.65;
+}
+
+.editorial-content h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 2.25rem;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.01em;
+}
+
+.editorial-content p {
+  font-size: 1rem;
+  color: var(--subtle);
+  margin-bottom: 0.9rem;
+  line-height: 1.72;
+}
+
+.editorial-content ul,
+.editorial-content ol {
+  margin-left: 1.2rem;
+  margin-bottom: 1rem;
+}
+
+.editorial-content li {
+  font-size: 1rem;
+  color: var(--subtle);
+  line-height: 1.7;
+  margin-bottom: 0.3rem;
+}
+
+.editorial-content a {
+  color: var(--love);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s;
+}
+
+.editorial-content a:hover {
+  border-color: var(--love);
+}
+
+.editorial-content code {
+  font-family: 'Courier New', monospace;
+  font-size: 0.86rem;
+  background: var(--overlay);
+  color: var(--text);
+  padding: 0.1em 0.4em;
+  border-radius: 2px;
+}
+
+.editorial-content pre {
+  background: var(--overlay);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1rem 1.2rem;
+  overflow-x: auto;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.editorial-content pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.84rem;
+  line-height: 1.65;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.5rem 0;
+}
+
+/* ── Difference callouts (about page) ── */
+.callout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.callout {
+  background: var(--overlay);
+  border-radius: 3px;
+  padding: 1rem 1.1rem;
+}
+
+.callout .callout-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.4rem;
+}
+
+.callout p {
+  font-size: 0.92rem;
+  color: var(--subtle);
+  margin-bottom: 0;
+  line-height: 1.55;
+}
+
+/* ── Join form embed ── */
+.form-wrapper {
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.form-wrapper iframe {
+  display: block;
+  width: 100%;
+  border: none;
+  min-height: 640px;
+}
+
+.btn-primary {
+  display: inline-block;
+  padding: 0.5rem 1.2rem;
+  background: var(--love);
+  color: var(--surface);
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 1rem;
+  font-style: italic;
+  border-radius: 2px;
+  text-decoration: none;
+  border: none;
+  transition: background 0.15s;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.btn-primary:hover {
+  background: var(--rose);
+  border-color: transparent;
+}
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  header {
+    padding: 1rem 1.25rem;
+  }
+
+  #info-card {
+    bottom: 5.5rem;
+    padding: 1.1rem 1.25rem 1rem;
+  }
+
+  .editorial-content {
+    padding: 6rem 1.25rem 4rem;
+  }
+
+  .callout-grid {
+    grid-template-columns: 1fr;
+  }
+}
