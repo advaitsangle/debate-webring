@@ -427,7 +427,6 @@
 
   function hideCard() {
     infoCard.classList.add('hidden');
-    connLine.style.display = 'none';
     selectedIdx = -1;
     dots.forEach((d)     => { d.classList.remove('selected'); d.setAttribute('r', 4); });
     labels.forEach((l)   => l.classList.remove('selected'));
