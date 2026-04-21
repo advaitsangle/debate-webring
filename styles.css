@@ -601,18 +601,19 @@ body.index-page header {
   align-items: center;
   gap: 0.2rem;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.1rem 0.45rem;
-  font-size: 0.68rem;
+  border: 1px solid var(--muted);
+  border-radius: 5px;
+  padding: 0.22rem 0.6rem;
+  font-size: 0.78rem;
   font-family: 'Crimson Pro', Georgia, serif;
-  color: var(--subtle);
+  color: var(--text);
   line-height: 1.5;
+  box-shadow: 0 1px 4px rgba(58, 54, 87, 0.12);
 }
 
 #zoom-hint .hint-sep {
-  font-size: 0.6rem;
-  color: var(--border);
+  font-size: 0.7rem;
+  color: var(--muted);
 }
 
 #zoom-hint.fade {

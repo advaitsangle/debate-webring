@@ -59,7 +59,6 @@
   let selectedIdx = -1;
   let isDragging  = false;
   let dragStart   = { x: 0, y: 0, panX: 0, panY: 0 };
-  let hintTimer;
   let panRafId = null;
 
   // Filter state
@@ -190,7 +189,7 @@
     lines.push(line);
 
     const dot = makeSvgEl('circle', { class: 'ring-dot', r: 4 });
-    dot.addEventListener('click',      () => selectSite(i, false));
+    dot.addEventListener('click',      () => selectSite(i, true));
     dot.addEventListener('mouseenter', () => hoverSite(i, true));
     dot.addEventListener('mouseleave', () => hoverSite(i, false));
     gDots.appendChild(dot);
@@ -198,7 +197,7 @@
 
     const label = makeSvgEl('text', { class: 'ring-label' });
     label.textContent = site.name.split(' ')[0];
-    label.addEventListener('click',      () => selectSite(i, false));
+    label.addEventListener('click',      () => selectSite(i, true));
     label.addEventListener('mouseenter', () => hoverSite(i, true));
     label.addEventListener('mouseleave', () => hoverSite(i, false));
     gLabels.appendChild(label);
@@ -296,7 +295,8 @@
     siteRows[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     if (animateToNode) {
-      centerOnNode(i, () => showCard(i));
+      showCard(i);
+      centerOnNode(i);
     } else {
       layout();
       showCard(i);
@@ -483,6 +483,7 @@
     isDragging = true;
     dragStart  = { x: e.clientX, y: e.clientY, panX, panY };
     svg.style.cursor = 'grabbing';
+    dismissHint();
   });
 
   window.addEventListener('mousemove', (e) => {
@@ -518,10 +519,8 @@
 
   // ── Hint ──────────────────────────────────────────────────────────────────
   function dismissHint() {
-    clearTimeout(hintTimer);
     zoomHint.classList.add('fade');
   }
-  hintTimer = setTimeout(dismissHint, 3000);
 
   // ── Filter / Search ───────────────────────────────────────────────────────
   function getCountry(loc) {
