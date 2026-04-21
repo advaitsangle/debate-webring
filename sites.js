@@ -27,4 +27,13 @@ const SITES = [
     location: "Waterloo, Ontario, Canada",
     description: "cool blogs",
   },
+
+  {
+    name: "Alex Zhu",
+    url: "https://probablyalex.com",
+    type: "website",
+    club: "University of Waterloo Debating Society",
+    location: "Waterloo, Ontario, Canada",
+    description: "software engineering + life + debate",
+  },
 ];
