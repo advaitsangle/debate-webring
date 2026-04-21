@@ -361,13 +361,6 @@ body.index-page header {
 }
 
 /* ── Card connector line ── */
-.card-connector {
-  stroke: var(--muted);
-  stroke-width: 0.75;
-  stroke-dasharray: 3 4;
-  opacity: 0.45;
-  pointer-events: none;
-}
 
 .ring-dot {
   fill: var(--muted);

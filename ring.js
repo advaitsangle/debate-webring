@@ -66,17 +66,11 @@
   let filterType    = '';
   let filterCountry = '';
 
-  // ── SVG layers: lines → dots → labels → connector ─────────────────────────
-  const gLines     = makeSvgEl('g');
-  const gDots      = makeSvgEl('g');
-  const gLabels    = makeSvgEl('g');
-  const gConnector = makeSvgEl('g');
-  svg.append(gLines, gDots, gLabels, gConnector);
-
-  // Single connector line from selected node to card
-  const connLine = makeSvgEl('line', { class: 'card-connector' });
-  connLine.style.display = 'none';
-  gConnector.appendChild(connLine);
+  // ── SVG layers: lines → dots → labels ────────────────────────────────────
+  const gLines  = makeSvgEl('g');
+  const gDots   = makeSvgEl('g');
+  const gLabels = makeSvgEl('g');
+  svg.append(gLines, gDots, gLabels);
 
   // ── Force-directed layout — runs once, result cached forever ─────────────
   // Uses seeded random starting positions + Fruchterman-Reingold forces.
@@ -407,17 +401,6 @@
     infoCard.style.top    = top  + 'px';
     infoCard.style.bottom = 'auto';
 
-    // Connector line in SVG coordinates
-    const cardCenterSvgX = (left - svgRect.left) + cW / 2;
-    const isAbove = top < nodeY - svgRect.top;
-    // Connect dot to the nearest horizontal edge of the card
-    const connY2 = isAbove ? (top - svgRect.top + cH) : (top - svgRect.top);
-
-    connLine.setAttribute('x1', dotCx);
-    connLine.setAttribute('y1', dotCy);
-    connLine.setAttribute('x2', cardCenterSvgX);
-    connLine.setAttribute('y2', connY2);
-    connLine.style.display = '';
   }
 
   function showCard(i) {
