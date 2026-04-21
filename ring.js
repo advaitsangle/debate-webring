@@ -595,7 +595,10 @@
       row.className = 'site-row';
       const typeLabel = TYPE_LABELS[site.type] || site.type || 'website';
       const typeClass = TYPE_CLASS[site.type] || '';
-      const meta = [site.club, site.location].filter(Boolean).join(' · ');
+      const country = getCountry(site.location);
+      const flag = countryFlag(country) || country;
+      const flagHtml = flag ? `<span class="site-row-flag">${flag}</span> ` : '';
+      const meta = flagHtml + (site.club || '');
       const hostname = (() => { try { return new URL(site.url).hostname; } catch { return site.url; } })();
 
       row.innerHTML =

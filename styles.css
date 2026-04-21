@@ -136,7 +136,6 @@ body.index-page header {
 
 #search-input::placeholder {
   color: var(--muted);
-  font-style: italic;
 }
 
 #filter-row {
@@ -300,6 +299,10 @@ body.index-page header {
   font-size: 0.75rem;
   color: var(--muted);
   font-style: italic;
+}
+
+.site-row-flag {
+  font-style: normal;
 }
 
 .site-row-url {
