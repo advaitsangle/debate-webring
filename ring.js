@@ -460,12 +460,12 @@
   // ── Prev / Next buttons ───────────────────────────────────────────────────
   document.getElementById('prev-btn').addEventListener('click', () => {
     const n = SITES.length;
-    selectSite(selectedIdx === -1 ? n - 1 : (selectedIdx - 1 + n) % n, false);
+    selectSite(selectedIdx === -1 ? n - 1 : (selectedIdx - 1 + n) % n, true);
   });
 
   document.getElementById('next-btn').addEventListener('click', () => {
     const n = SITES.length;
-    selectSite(selectedIdx === -1 ? 0 : (selectedIdx + 1) % n, false);
+    selectSite(selectedIdx === -1 ? 0 : (selectedIdx + 1) % n, true);
   });
 
   // ── Zoom ──────────────────────────────────────────────────────────────────
