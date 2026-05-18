@@ -294,24 +294,23 @@ body.index-page {
   opacity: 0.28;
 }
 
-/* Right-edge colored bar — colored by site type via :has() */
+/* Right-edge accent bar — hidden by default, slides in on hover/active.
+   Color comes from --row-accent set per row from site.color. */
 .site-row::after {
   content: '';
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
-  width: 4px;
-  background: var(--muted);
-  transition: background 0.15s;
+  width: 0;
+  background: var(--row-accent, var(--love));
+  transition: width 0.2s cubic-bezier(0.3, 1, 0.5, 1);
 }
 
-.site-row:has(.type-website)::after    { background: var(--pine); }
-.site-row:has(.type-newsletter)::after,
-.site-row:has(.type-substack)::after   { background: var(--gold); }
-.site-row:has(.type-youtube)::after    { background: var(--love); }
-.site-row:has(.type-podcast)::after    { background: var(--iris); }
-.site-row:has(.type-other)::after      { background: var(--foam); }
+.site-row:hover::after,
+.site-row.active::after {
+  width: 4px;
+}
 
 .site-row-main {
   display: flex;

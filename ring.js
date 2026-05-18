@@ -458,6 +458,7 @@
     SITES.forEach((site, i) => {
       const row = document.createElement('div');
       row.className = 'site-row';
+      if (site.color) row.style.setProperty('--row-accent', site.color);
       const typeLabel = TYPE_LABELS[site.type] || site.type || 'website';
       const typeClass = TYPE_CLASS[site.type] || '';
       const country = getCountry(site.location);
