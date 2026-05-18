@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400;1,500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
 </head>
 <body class="editorial-page">
   <div id="sidebar-brand" class="floating">
@@ -88,6 +90,22 @@
         <span class="field-hint">Optional.</span>
       </div>
 
+      <div class="form-field">
+        <label>Drop your pin <span class="form-required">*</span></label>
+        <span class="field-hint">Click anywhere on the map. Pick a colour below.</span>
+        <input type="hidden" name="lat"   id="f-lat">
+        <input type="hidden" name="lng"   id="f-lng">
+        <input type="hidden" name="color" id="f-color">
+        <div id="join-map-wrap">
+          <svg id="join-map" aria-label="Pin your location"></svg>
+        </div>
+        <div id="color-swatches" role="radiogroup" aria-label="Pin colour">
+          <button type="button" class="swatch" data-color="#3BD2EF" style="--swatch:#3BD2EF" aria-label="Cyan"></button>
+          <button type="button" class="swatch" data-color="#EF3B71" style="--swatch:#EF3B71" aria-label="Pink"></button>
+          <button type="button" class="swatch" data-color="#FFB63A" style="--swatch:#FFB63A" aria-label="Yellow"></button>
+        </div>
+      </div>
+
       <div class="form-submit-row">
         <button class="btn-primary" type="submit" id="join-submit">Submit</button>
         <span class="form-status" id="form-status"></span>
@@ -133,6 +151,105 @@
         }
       });
 
+      // ── Pin map ───────────────────────────────────────────────────
+      const latInput   = document.getElementById('f-lat');
+      const lngInput   = document.getElementById('f-lng');
+      const colorInput = document.getElementById('f-color');
+      const mapSvg     = document.getElementById('join-map');
+      const mapWrap    = document.getElementById('join-map-wrap');
+      const swatchRow  = document.getElementById('color-swatches');
+
+      let joinProjection = null;
+      let userPin = null;
+
+      async function initJoinMap() {
+        const w = mapSvg.clientWidth || mapWrap.clientWidth || 600;
+        const h = 320;
+        mapSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+        const svgD3 = d3.select(mapSvg);
+        const rootG = svgD3.append('g');
+        const gCountries = rootG.append('g');
+        const gPin = rootG.append('g');
+
+        let topology;
+        try {
+          const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+          topology = await res.json();
+        } catch (err) {
+          console.error('Failed to load world atlas', err);
+          return;
+        }
+
+        const land = topojson.feature(topology, topology.objects.countries);
+        joinProjection = d3.geoNaturalEarth1().fitExtent(
+          [[w * 0.04, h * 0.06], [w * 0.96, h * 0.94]],
+          land,
+        );
+        const pathGen = d3.geoPath(joinProjection);
+
+        gCountries.selectAll('path')
+          .data(land.features)
+          .join('path')
+          .attr('class', 'country')
+          .attr('d', pathGen);
+
+        mapSvg.addEventListener('click', (e) => {
+          const pt = mapSvg.createSVGPoint();
+          pt.x = e.clientX; pt.y = e.clientY;
+          const local = pt.matrixTransform(mapSvg.getScreenCTM().inverse());
+          const coords = joinProjection.invert([local.x, local.y]);
+          if (!coords || !isFinite(coords[0]) || !isFinite(coords[1])) return;
+          const [lng, lat] = coords;
+          latInput.value = lat.toFixed(4);
+          lngInput.value = lng.toFixed(4);
+          drawPin(local.x, local.y);
+        });
+
+        function drawPin(x, y) {
+          const color = colorInput.value || '#EF3B71';
+          if (!userPin) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', 'pin user-pin');
+            const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            halo.setAttribute('class', 'pin-halo');
+            halo.setAttribute('r', 11);
+            halo.setAttribute('fill', 'none');
+            const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dot.setAttribute('class', 'pin-dot');
+            dot.setAttribute('r', 5);
+            g.appendChild(halo);
+            g.appendChild(dot);
+            gPin.node().appendChild(g);
+            userPin = { g, halo, dot };
+          }
+          userPin.g.setAttribute('transform', `translate(${x},${y})`);
+          userPin.halo.setAttribute('stroke', color);
+          userPin.dot.setAttribute('fill', color);
+        }
+
+        // Allow swatch re-color to update the existing pin
+        window.__joinDrawPin = () => {
+          if (latInput.value && lngInput.value) {
+            const [x, y] = joinProjection([parseFloat(lngInput.value), parseFloat(latInput.value)]);
+            drawPin(x, y);
+          }
+        };
+      }
+
+      initJoinMap();
+
+      // ── Swatch picker ─────────────────────────────────────────────
+      swatchRow.addEventListener('click', (e) => {
+        const swatch = e.target.closest('.swatch');
+        if (!swatch) return;
+        swatchRow.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+        swatch.classList.add('selected');
+        colorInput.value = swatch.dataset.color;
+        swatchRow.classList.remove('swatch-error');
+        if (window.__joinDrawPin) window.__joinDrawPin();
+      });
+
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (!form.checkValidity()) { form.reportValidity(); return; }
@@ -141,6 +258,17 @@
           typeTrigger.focus();
           return;
         }
+        if (!latInput.value || !lngInput.value) {
+          mapWrap.classList.add('pin-error');
+          mapWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        if (!colorInput.value) {
+          swatchRow.classList.add('swatch-error');
+          swatchRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        mapWrap.classList.remove('pin-error');
 
         btn.disabled = true;
         btn.textContent = 'Submitting…';

@@ -31,7 +31,7 @@
 
   if (tryRedirect()) return;
 
-  // ── Seeded PRNG (mulberry32) ──────────────────────────────────────────────
+  // ── Seeded PRNG (mulberry32) — kept for deterministic pin jitter ─────────
   function makePrng(seed) {
     let s = seed;
     return function () {
@@ -42,313 +42,37 @@
     };
   }
 
-  // ── Setup ─────────────────────────────────────────────────────────────────
+  // ── DOM references ───────────────────────────────────────────────────────
   const svg      = document.getElementById('ring-svg');
   const infoCard = document.getElementById('info-card');
   const counter  = document.getElementById('ring-counter');
   const controls = document.getElementById('ring-controls');
   const zoomHint = document.getElementById('zoom-hint');
-  const NS  = 'http://www.w3.org/2000/svg';
-  const TAU = Math.PI * 2;
+  const NS       = 'http://www.w3.org/2000/svg';
 
-  const BASE = window.location.href.split('#')[0].replace(/\/?$/, '');
-
-  let scale = 1;
-  let panX  = 0;
-  let panY  = 0;
-  let selectedIdx = -1;
-  let isDragging  = false;
-  let dragStart   = { x: 0, y: 0, panX: 0, panY: 0 };
-  let panRafId = null;
-
-  // Filter state
+  // ── State ────────────────────────────────────────────────────────────────
+  let selectedIdx   = -1;
   let searchQuery   = '';
   let filterType    = '';
   let filterCountry = '';
 
-  // ── SVG layers: lines → dots → labels ────────────────────────────────────
-  const gLines  = makeSvgEl('g');
-  const gDots   = makeSvgEl('g');
-  const gLabels = makeSvgEl('g');
-  svg.append(gLines, gDots, gLabels);
-
-  // ── Force-directed layout — runs once, result cached forever ─────────────
-  // Uses seeded random starting positions + Fruchterman-Reingold forces.
-  // Returns normalised coords in [-1, 1] space; getPositions scales to actual r.
-  let _cachedLayout = null;
-
-  function computeLayout() {
-    const n    = SITES.length;
-    const rand = makePrng(0xDEBA7F);
-
-    // Seeded random start — uniform distribution inside unit disc
-    const px = new Float32Array(n);
-    const py = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      const a    = rand() * TAU;
-      const dist = Math.sqrt(rand()) * 0.82;
-      px[i] = dist * Math.cos(a);
-      py[i] = dist * Math.sin(a);
-    }
-
-    // Repulsion-only layout: nodes spread into an organic cloud (no ring attraction)
-    const k    = Math.sqrt(Math.PI / n) * 1.35;
-    const ITER = 120;
-
-    for (let it = 0; it < ITER; it++) {
-      const fx = new Float32Array(n);
-      const fy = new Float32Array(n);
-
-      // Repulsion between every pair
-      for (let i = 0; i < n; i++) {
-        for (let j = i + 1; j < n; j++) {
-          const dx = px[i] - px[j];
-          const dy = py[i] - py[j];
-          const d  = Math.sqrt(dx * dx + dy * dy) || 1e-4;
-          const f  = (k * k) / d;
-          fx[i] += (dx / d) * f;  fy[i] += (dy / d) * f;
-          fx[j] -= (dx / d) * f;  fy[j] -= (dy / d) * f;
-        }
-      }
-
-      // Soft center pull keeps the cloud from flying apart
-      for (let i = 0; i < n; i++) {
-        fx[i] -= px[i] * 0.07;
-        fy[i] -= py[i] * 0.07;
-      }
-
-      const temp = 0.12 * (1 - it / ITER);
-      for (let i = 0; i < n; i++) {
-        const mag  = Math.sqrt(fx[i] * fx[i] + fy[i] * fy[i]) || 1;
-        const disp = Math.min(mag, temp);
-        px[i] += (fx[i] / mag) * disp;
-        py[i] += (fy[i] / mag) * disp;
-      }
-    }
-
-    // Nearest-neighbour TSP: reorder positions so consecutive ring nodes land close
-    const visited = new Uint8Array(n);
-    const order   = new Int32Array(n);
-    order[0]      = 0;
-    visited[0]    = 1;
-    for (let step = 1; step < n; step++) {
-      const cur = order[step - 1];
-      let best = -1, bestD = Infinity;
-      for (let j = 0; j < n; j++) {
-        if (visited[j]) continue;
-        const dx = px[cur] - px[j], dy = py[cur] - py[j];
-        const d  = dx * dx + dy * dy;
-        if (d < bestD) { bestD = d; best = j; }
-      }
-      order[step]   = best;
-      visited[best] = 1;
-    }
-
-    // Normalize so the outermost node sits at exactly radius 0.85 — makes the
-    // radius multiplier in getPositions a reliable fraction of the panel size.
-    let maxR = 0;
-    for (let i = 0; i < n; i++) {
-      const d = Math.sqrt(px[order[i]] * px[order[i]] + py[order[i]] * py[order[i]]);
-      if (d > maxR) maxR = d;
-    }
-    const norm = 0.85 / (maxR || 1);
-
-    // Ring node i gets the position at order[i]
-    return Array.from({ length: n }, (_, i) => ({ x: px[order[i]] * norm, y: py[order[i]] * norm }));
-  }
-
-  // At scale=1 the outermost node (at normalised radius 0.85) sits exactly
-  // min(w,h)/2 - NODE_PAD pixels from centre — no guesswork multiplier needed.
-  const NODE_PAD = 56; // pixels of breathing room for labels at fit-view
-
-  function fitRadius(w, h) {
-    return (Math.min(w, h) / 2 - NODE_PAD) / 0.85;
-  }
-
-  function getPositions(cx, cy, w, h) {
-    if (!_cachedLayout) _cachedLayout = computeLayout();
-    const r = fitRadius(w, h) * scale;
-    return _cachedLayout.map(p => ({ x: cx + p.x * r, y: cy + p.y * r }));
-  }
-
-  // ── Build SVG elements ────────────────────────────────────────────────────
-  const lines    = [];
-  const dots     = [];
-  const labels   = [];
+  let projection;
+  let zoomBehavior;
+  let pinOffsets = [];
+  const pinElems = [];
   const siteRows = [];
 
-  SITES.forEach((site, i) => {
-    const line = makeSvgEl('line', { class: 'ring-line' });
-    gLines.appendChild(line);
-    lines.push(line);
+  // ── D3 setup ─────────────────────────────────────────────────────────────
+  const svgD3 = d3.select(svg);
+  let rootG, gCountries, gPins;
 
-    const dot = makeSvgEl('circle', { class: 'ring-dot', r: 4 });
-    dot.addEventListener('click',      () => selectSite(i, true));
-    dot.addEventListener('mouseenter', () => hoverSite(i, true));
-    dot.addEventListener('mouseleave', () => hoverSite(i, false));
-    gDots.appendChild(dot);
-    dots.push(dot);
+  // ── Tooltip element ──────────────────────────────────────────────────────
+  const tooltip = document.createElement('div');
+  tooltip.id = 'pin-tooltip';
+  tooltip.className = 'hidden';
+  document.body.appendChild(tooltip);
 
-    const label = makeSvgEl('text', { class: 'ring-label' });
-    label.textContent = site.name.split(' ')[0];
-    label.addEventListener('click',      () => selectSite(i, true));
-    label.addEventListener('mouseenter', () => hoverSite(i, true));
-    label.addEventListener('mouseleave', () => hoverSite(i, false));
-    gLabels.appendChild(label);
-    labels.push(label);
-  });
-
-  // ── Layout ────────────────────────────────────────────────────────────────
-  function getSvgSize() {
-    const r = svg.getBoundingClientRect();
-    return {
-      w: r.width  || svg.clientWidth  || window.innerWidth  * 0.58,
-      h: r.height || svg.clientHeight || window.innerHeight,
-    };
-  }
-
-  function layout() {
-    const { w, h } = getSvgSize();
-    const cx = w / 2 + panX;
-    const cy = h / 2 + panY;
-    const pos = getPositions(cx, cy, w, h);
-    const n = SITES.length;
-
-    pos.forEach((p, i) => {
-      const next = pos[(i + 1) % n];
-
-      lines[i].setAttribute('x1', p.x);
-      lines[i].setAttribute('y1', p.y);
-      lines[i].setAttribute('x2', next.x);
-      lines[i].setAttribute('y2', next.y);
-
-      dots[i].setAttribute('cx', p.x);
-      dots[i].setAttribute('cy', p.y);
-      dots[i].setAttribute('r', i === selectedIdx ? 6.5 : 4);
-
-      const dx = p.x - cx, dy = p.y - cy;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      const lx = p.x + (dx / len) * 18;
-      const ly = p.y + (dy / len) * 18;
-      labels[i].setAttribute('x', lx);
-      labels[i].setAttribute('y', ly);
-
-      const sin = Math.abs(Math.sin(Math.atan2(dy, dx)));
-      labels[i].setAttribute('dy', sin > 0.5 ? (dy > 0 ? '1em' : '-0.3em') : '0.35em');
-
-      if (dx > 15)       labels[i].setAttribute('text-anchor', 'start');
-      else if (dx < -15) labels[i].setAttribute('text-anchor', 'end');
-      else               labels[i].setAttribute('text-anchor', 'middle');
-    });
-
-    // Card and connector track the selected node during pan/zoom
-    if (selectedIdx !== -1 && !infoCard.classList.contains('hidden')) {
-      repositionCard(selectedIdx);
-    }
-  }
-
-  // ── Animated pan to centre a node ────────────────────────────────────────
-  function animatePanTo(targetX, targetY, onDone) {
-    if (panRafId) cancelAnimationFrame(panRafId);
-    const startX = panX, startY = panY;
-    const dx = targetX - startX, dy = targetY - startY;
-    const duration = 650;
-    const startTime = performance.now();
-
-    function step(now) {
-      const t    = Math.min(1, (now - startTime) / duration);
-      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-      panX = startX + dx * ease;
-      panY = startY + dy * ease;
-      layout();
-      if (t < 1) {
-        panRafId = requestAnimationFrame(step);
-      } else {
-        panRafId = null;
-        if (onDone) onDone();
-      }
-    }
-    panRafId = requestAnimationFrame(step);
-  }
-
-  function centerOnNode(i, onDone) {
-    const { w, h } = getSvgSize();
-    const natural = getPositions(w / 2, h / 2, w, h);
-    animatePanTo(w / 2 - natural[i].x, h / 2 - natural[i].y, onDone);
-  }
-
-  // ── Selection ─────────────────────────────────────────────────────────────
-  function selectSite(i, animateToNode) {
-    selectedIdx = i;
-    dots.forEach((d, j)     => d.classList.toggle('selected', j === i));
-    labels.forEach((l, j)   => l.classList.toggle('selected', j === i));
-    siteRows.forEach((r, j) => r.classList.toggle('active', j === i));
-    updateLines();
-    updateCounter();
-    applyDimming();
-    siteRows[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-    if (animateToNode) {
-      showCard(i);
-      centerOnNode(i);
-    } else {
-      layout();
-      showCard(i);
-    }
-  }
-
-  function hoverSite(i, on) {
-    if (i === selectedIdx) return;
-    dots[i].classList.toggle('hovered', on);
-    labels[i].classList.toggle('hovered', on);
-  }
-
-  function updateLines() {
-    const n = SITES.length;
-    lines.forEach((l, i) => {
-      const active = selectedIdx !== -1 &&
-        (i === selectedIdx || i === (selectedIdx - 1 + n) % n);
-      l.classList.toggle('active', active);
-    });
-  }
-
-  function updateCounter() {
-    counter.textContent = selectedIdx === -1
-      ? `${SITES.length} sites`
-      : `${selectedIdx + 1} / ${SITES.length}`;
-    controls.classList.toggle('has-selection', selectedIdx !== -1);
-  }
-
-  // ── Dimming: selection mode greys all but selected+neighbours ─────────────
-  function computeVisible() {
-    const n = SITES.length;
-    if (selectedIdx !== -1) {
-      const sel = new Set([
-        selectedIdx,
-        (selectedIdx - 1 + n) % n,
-        (selectedIdx + 1) % n,
-      ]);
-      return SITES.map((_, i) => sel.has(i));
-    }
-    // No selection — apply filter
-    const anyFilter = searchQuery || filterType || filterCountry;
-    if (!anyFilter) return SITES.map(() => true);
-    const matched = new Set(
-      SITES.map((s, i) => siteMatches(s) ? i : -1).filter(i => i !== -1)
-    );
-    return SITES.map((_, i) => matched.has(i));
-  }
-
-  function applyDimming() {
-    const n = SITES.length;
-    const vis = computeVisible();
-    dots.forEach((d, i)     => d.classList.toggle('dimmed', !vis[i]));
-    labels.forEach((l, i)   => l.classList.toggle('dimmed', !vis[i]));
-    lines.forEach((l, i)    => l.classList.toggle('dimmed', !vis[i] || !vis[(i + 1) % n]));
-    siteRows.forEach((r, i) => r.classList.toggle('dimmed', !vis[i]));
-  }
-
-  // ── Info card ─────────────────────────────────────────────────────────────
+  // ── Type constants ───────────────────────────────────────────────────────
   const TYPE_LABELS = {
     website:    'website',
     newsletter: 'newsletter',
@@ -367,30 +91,249 @@
     other:      'type-other',
   };
 
-  // Positions the card above/below the node and updates the connector line
-  function repositionCard(i) {
-    const svgRect = svg.getBoundingClientRect();
-    const dotCx = parseFloat(dots[i].getAttribute('cx') || '0');
-    const dotCy = parseFloat(dots[i].getAttribute('cy') || '0');
-    const nodeX = svgRect.left + dotCx;
-    const nodeY = svgRect.top  + dotCy;
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function makeSvgEl(tag, attrs = {}) {
+    const el = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  }
 
-    const cW         = Math.min(300, svgRect.width - 24);
+  function getSvgSize() {
+    const r = svg.getBoundingClientRect();
+    return {
+      w: r.width  || svg.clientWidth  || window.innerWidth  * 0.58,
+      h: r.height || svg.clientHeight || window.innerHeight,
+    };
+  }
+
+  function dismissHint() {
+    zoomHint.classList.add('fade');
+  }
+
+  // ── Cluster jitter: only fans out pins that share exact coords ───────────
+  function computeJitter() {
+    const groups = new Map();
+    SITES.forEach((s, i) => {
+      if (s.lat == null || s.lng == null) return;
+      const key = `${s.lat.toFixed(3)},${s.lng.toFixed(3)}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(i);
+    });
+    const offsets = SITES.map(() => [0, 0]);
+    groups.forEach((indices) => {
+      if (indices.length === 1) return;
+      const r = 9;
+      indices.forEach((idx, k) => {
+        const angle = (k / indices.length) * Math.PI * 2;
+        offsets[idx] = [Math.cos(angle) * r, Math.sin(angle) * r];
+      });
+    });
+    return offsets;
+  }
+
+  // ── Map + pin rendering ──────────────────────────────────────────────────
+  async function renderMap() {
+    svgD3.selectAll('*').remove();
+    rootG       = svgD3.append('g').attr('class', 'map-root');
+    gCountries  = rootG.append('g').attr('class', 'countries');
+    gPins       = rootG.append('g').attr('class', 'pins');
+
+    let topology;
+    try {
+      const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+      topology = await res.json();
+    } catch (err) {
+      console.error('Failed to load world atlas', err);
+      return;
+    }
+
+    const land = topojson.feature(topology, topology.objects.countries);
+
+    const { w, h } = getSvgSize();
+    projection = d3.geoNaturalEarth1().fitExtent(
+      [[w * 0.04, h * 0.06], [w * 0.96, h * 0.94]],
+      land,
+    );
+
+    const pathGen = d3.geoPath(projection);
+
+    gCountries
+      .selectAll('path')
+      .data(land.features)
+      .join('path')
+      .attr('class', 'country')
+      .attr('d', pathGen);
+
+    pinOffsets = computeJitter();
+    pinElems.length = 0;
+    drawPins();
+
+    zoomBehavior = d3.zoom()
+      .scaleExtent([1, 8])
+      .on('zoom', onZoom);
+    svgD3.call(zoomBehavior);
+
+    // Restore any pre-render selection state
+    applyPinClasses();
+    applyDimming();
+  }
+
+  function onZoom(event) {
+    rootG.attr('transform', event.transform);
+    if (selectedIdx !== -1 && !infoCard.classList.contains('hidden')) {
+      repositionCard(selectedIdx);
+    }
+    dismissHint();
+  }
+
+  function drawPins() {
+    SITES.forEach((site, i) => {
+      if (site.lat == null || site.lng == null) {
+        pinElems.push(null);
+        return;
+      }
+      const [px, py] = projection([site.lng, site.lat]);
+      const [jx, jy] = pinOffsets[i];
+      const x = px + jx;
+      const y = py + jy;
+      const color = site.color || '#EF3B71';
+
+      const g = makeSvgEl('g', { class: 'pin', transform: `translate(${x},${y})` });
+      g.dataset.idx = String(i);
+
+      const halo = makeSvgEl('circle', { class: 'pin-halo', r: 9, fill: 'none' });
+      halo.setAttribute('stroke', color);
+      g.appendChild(halo);
+
+      const dot = makeSvgEl('circle', { class: 'pin-dot', r: 4.5 });
+      dot.setAttribute('fill', color);
+      g.appendChild(dot);
+
+      g.addEventListener('click', (e) => {
+        e.stopPropagation();
+        selectSite(i, true);
+      });
+      g.addEventListener('mouseenter', (e) => {
+        hoverSite(i, true);
+        showTooltip(site.name, e);
+      });
+      g.addEventListener('mousemove', positionTooltip);
+      g.addEventListener('mouseleave', () => {
+        hoverSite(i, false);
+        hideTooltip();
+      });
+
+      gPins.node().appendChild(g);
+      pinElems.push(g);
+    });
+  }
+
+  // ── Tooltip ──────────────────────────────────────────────────────────────
+  function showTooltip(text, e) {
+    tooltip.textContent = text;
+    tooltip.classList.remove('hidden');
+    positionTooltip(e);
+  }
+
+  function positionTooltip(e) {
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 8)  + 'px';
+  }
+
+  function hideTooltip() {
+    tooltip.classList.add('hidden');
+  }
+
+  // Background click → deselect (pins stopPropagation; countries are pointer-events:none)
+  svg.addEventListener('click', () => hideCard());
+
+  // ── Selection ────────────────────────────────────────────────────────────
+  function selectSite(i, animate) {
+    selectedIdx = i;
+    applyPinClasses();
+    siteRows.forEach((r, j) => r.classList.toggle('active', j === i));
+    updateCounter();
+    siteRows[i]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    if (animate) {
+      centerOnPin(i, () => showCard(i));
+    } else {
+      showCard(i);
+    }
+  }
+
+  function applyPinClasses() {
+    pinElems.forEach((p, j) => {
+      if (!p) return;
+      p.classList.toggle('selected', j === selectedIdx);
+    });
+  }
+
+  function hoverSite(i, on) {
+    if (i === selectedIdx) return;
+    if (pinElems[i]) pinElems[i].classList.toggle('hovered', on);
+  }
+
+  function updateCounter() {
+    counter.textContent = selectedIdx === -1
+      ? `${SITES.length} sites`
+      : `${selectedIdx + 1} / ${SITES.length}`;
+    controls.classList.toggle('has-selection', selectedIdx !== -1);
+  }
+
+  // ── Dimming: filter mode greys non-matching rows + pins ──────────────────
+  function computeVisible() {
+    const anyFilter = searchQuery || filterType || filterCountry;
+    if (!anyFilter) return SITES.map(() => true);
+    return SITES.map(s => siteMatches(s));
+  }
+
+  function applyDimming() {
+    const vis = computeVisible();
+    pinElems.forEach((p, i) => { if (p) p.classList.toggle('dimmed', !vis[i]); });
+    siteRows.forEach((r, i) => r.classList.toggle('dimmed', !vis[i]));
+  }
+
+  // ── Animated pan/zoom to a pin ───────────────────────────────────────────
+  function centerOnPin(i, onDone) {
+    if (!pinElems[i] || !zoomBehavior) { onDone?.(); return; }
+    const site = SITES[i];
+    const [px, py] = projection([site.lng, site.lat]);
+    const [jx, jy] = pinOffsets[i];
+    const x = px + jx;
+    const y = py + jy;
+    const { w, h } = getSvgSize();
+    const current = d3.zoomTransform(svg);
+    const k  = Math.max(current.k, 2.4);
+    const tx = w / 2 - x * k;
+    const ty = h / 2 - y * k;
+    svgD3.transition().duration(700)
+      .call(zoomBehavior.transform, d3.zoomIdentity.translate(tx, ty).scale(k))
+      .on('end', () => onDone?.());
+  }
+
+  // ── Info card ────────────────────────────────────────────────────────────
+  function repositionCard(i) {
+    if (!pinElems[i]) return;
+    const svgRect = svg.getBoundingClientRect();
+    const m = pinElems[i].getCTM();
+    if (!m) return;
+    const nodeX = svgRect.left + m.e;
+    const nodeY = svgRect.top  + m.f;
+
+    const cW         = Math.min(320, svgRect.width - 24);
     const cH         = 220;
     const margin     = 12;
-    const nodeR      = 24; // clearance beyond the selected dot radius
+    const nodeR      = 24;
     const bottomSafe = window.innerHeight - 90;
 
-    // Card must be entirely above or below the node — never overlapping it
     const spaceAbove = nodeY - svgRect.top - margin;
     const spaceBelow = bottomSafe - nodeY - margin;
 
     let top;
     if (spaceAbove >= cH + nodeR || spaceAbove >= spaceBelow) {
-      // Place card above: bottom edge = nodeY - nodeR
       top = Math.max(svgRect.top + margin, nodeY - nodeR - cH);
     } else {
-      // Place card below: top edge = nodeY + nodeR
       top = Math.min(bottomSafe - cH, nodeY + nodeR);
     }
 
@@ -400,7 +343,6 @@
     infoCard.style.left   = left + 'px';
     infoCard.style.top    = top  + 'px';
     infoCard.style.bottom = 'auto';
-
   }
 
   function showCard(i) {
@@ -428,18 +370,14 @@
   function hideCard() {
     infoCard.classList.add('hidden');
     selectedIdx = -1;
-    dots.forEach((d)     => { d.classList.remove('selected'); d.setAttribute('r', 4); });
-    labels.forEach((l)   => l.classList.remove('selected'));
+    applyPinClasses();
     siteRows.forEach((r) => r.classList.remove('active'));
-    updateLines();
     updateCounter();
-    applyDimming();
-    layout();
   }
 
   document.getElementById('card-close').addEventListener('click', hideCard);
 
-  // ── Prev / Next buttons ───────────────────────────────────────────────────
+  // ── Prev / Next ──────────────────────────────────────────────────────────
   document.getElementById('prev-btn').addEventListener('click', () => {
     const n = SITES.length;
     selectSite(selectedIdx === -1 ? n - 1 : (selectedIdx - 1 + n) % n, true);
@@ -450,61 +388,7 @@
     selectSite(selectedIdx === -1 ? 0 : (selectedIdx + 1) % n, true);
   });
 
-  // ── Zoom ──────────────────────────────────────────────────────────────────
-  svg.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    scale = Math.max(0.05, Math.min(5, scale * (e.deltaY < 0 ? 1.1 : 0.91)));
-    layout();
-    dismissHint();
-  }, { passive: false });
-
-  // ── Pan ───────────────────────────────────────────────────────────────────
-  svg.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
-    if (panRafId) { cancelAnimationFrame(panRafId); panRafId = null; }
-    isDragging = true;
-    dragStart  = { x: e.clientX, y: e.clientY, panX, panY };
-    svg.style.cursor = 'grabbing';
-    dismissHint();
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    panX = dragStart.panX + (e.clientX - dragStart.x);
-    panY = dragStart.panY + (e.clientY - dragStart.y);
-    layout();
-  });
-
-  window.addEventListener('mouseup', () => {
-    isDragging = false;
-    svg.style.cursor = 'grab';
-  });
-
-  let lastTouch = null;
-  svg.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1)
-      lastTouch = { x: e.touches[0].clientX, y: e.touches[0].clientY, panX, panY };
-  }, { passive: true });
-
-  svg.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 1 || !lastTouch) return;
-    e.preventDefault();
-    panX = lastTouch.panX + (e.touches[0].clientX - lastTouch.x);
-    panY = lastTouch.panY + (e.touches[0].clientY - lastTouch.y);
-    layout();
-    dismissHint();
-  }, { passive: false });
-
-  svg.addEventListener('touchend', () => { lastTouch = null; });
-
-  window.addEventListener('resize', layout);
-
-  // ── Hint ──────────────────────────────────────────────────────────────────
-  function dismissHint() {
-    zoomHint.classList.add('fade');
-  }
-
-  // ── Filter / Search ───────────────────────────────────────────────────────
+  // ── Filter / search helpers ──────────────────────────────────────────────
   function getCountry(loc) {
     if (!loc) return '';
     const parts = loc.split(',');
@@ -550,7 +434,7 @@
     return true;
   }
 
-  // ── Site list (left panel) ────────────────────────────────────────────────
+  // ── Site list (left panel) ───────────────────────────────────────────────
   function buildList() {
     const locationPanel = document.querySelector('#filter-location .custom-select-panel');
     if (locationPanel) {
@@ -643,16 +527,18 @@
     });
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-  updateCounter();
-  layout();
+  // ── Resize ───────────────────────────────────────────────────────────────
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      renderMap();
+    }, 250);
+  });
+
+  // ── Init ─────────────────────────────────────────────────────────────────
   buildList();
   initCustomSelects();
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  function makeSvgEl(tag, attrs = {}) {
-    const el = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-    return el;
-  }
+  updateCounter();
+  renderMap();
 })();
