@@ -321,4 +321,13 @@ const SITES = [
     location: "Cape Town, South Africa",
     description: "A podcast about ideas that are genuinely difficult to argue against.",
   },
+
+  {
+    name: "test",
+    url: "https://www.test.com",
+    type: "newsletter",
+    club: "test",
+    location: "test",
+    description: "test",
+  },
 ];
