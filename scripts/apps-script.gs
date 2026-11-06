@@ -15,6 +15,9 @@
 //      Triggers (clock icon, left sidebar) → Add Trigger
 //      Function: onSheetEdit  |  Event source: From spreadsheet  |  Event type: On edit
 //      (A simple onEdit trigger can't call MailApp or UrlFetchApp — installable one can)
+// 6. Set up a daily trigger to warn you before the GitHub token expires:
+//      Triggers → Add Trigger
+//      Function: checkTokenExpiry  |  Event source: Time-driven  |  Day timer
 //
 // WORKFLOW:
 //   Submission → sheet row + email to you
@@ -104,10 +107,73 @@ function onSheetEdit(e) {
   const values = sheet.getRange(row, 1, 1, 8).getValues()[0];
   const [, name, email, url, type, club, location, description] = values;
 
-  addToGitHub_({ name, url, type, club, location, description });
-  sendApprovalEmail_({ name, email, url });
+  try {
+    addToGitHub_({ name, url, type, club, location, description });
+  } catch (err) {
+    range.setValue(`Error: ${err.message}`);
+    MailApp.sendEmail({
+      to: ADMIN_EMAIL,
+      subject: `[Webring] Approval failed: ${name}`,
+      body: `Could not add ${name} (${url}) to sites.js.\n\n${err.message}\n\n` +
+            'Fix the problem (often an expired GITHUB_TOKEN), then set Status back to "Approved".',
+    });
+    return;
+  }
 
+  sendApprovalEmail_({ name, email, url });
   range.setValue('Published');
+}
+
+// ── Daily check: warn before the GitHub token expires ────────────────────
+// Register as a time-driven trigger (see setup step 6 above).
+
+const EXPIRY_WARNING_DAYS = 14;
+
+function checkTokenExpiry() {
+  const token = PropertiesService.getScriptProperties().getProperty('GITHUB_TOKEN');
+  const res = UrlFetchApp.fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`, {
+    headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/vnd.github.v3+json' },
+    muteHttpExceptions: true,
+  });
+
+  const code = res.getResponseCode();
+  if (code !== 200) {
+    warnToken_(`The GitHub token check failed with HTTP ${code}. The token has probably expired ` +
+               'or been revoked. Approvals will not reach sites.js until it is replaced.');
+    return;
+  }
+
+  // GitHub reports the expiry of personal access tokens in this response header.
+  const headers = res.getAllHeaders();
+  const key = Object.keys(headers).find(k => k.toLowerCase() === 'github-authentication-token-expiration');
+  if (!key) return; // token has no expiry
+
+  const expires = parseGitHubDate_(String(headers[key]));
+  if (isNaN(expires)) {
+    warnToken_(`Could not read the token expiry date from GitHub ("${headers[key]}"). Check it manually.`);
+    return;
+  }
+  const daysLeft = Math.floor((expires - new Date()) / 86400000);
+  if (daysLeft <= EXPIRY_WARNING_DAYS) {
+    warnToken_(`The GitHub token expires in ${daysLeft} day(s), on ${headers[key]}.`);
+  }
+}
+
+// Accepts "2026-12-01 00:00:00 -0500" or "2026-12-01 05:00:00 UTC".
+function parseGitHubDate_(str) {
+  const m = str.match(/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) (?:UTC|([+-]\d{2})(\d{2}))$/);
+  if (!m) return new Date(NaN);
+  const offset = m[3] ? `${m[3]}:${m[4]}` : 'Z';
+  return new Date(`${m[1]}T${m[2]}${offset}`);
+}
+
+function warnToken_(message) {
+  MailApp.sendEmail({
+    to: ADMIN_EMAIL,
+    subject: '[Webring] GitHub token needs attention',
+    body: message + '\n\nCreate a new fine-grained token (Contents: read & write on ' +
+          `${REPO_OWNER}/${REPO_NAME}) and update the GITHUB_TOKEN script property.`,
+  });
 }
 
 // ── Append new site to sites.js via GitHub API ────────────────────────────
@@ -122,6 +188,9 @@ function addToGitHub_({ name, url, type, club, location, description }) {
   };
 
   const getRes  = UrlFetchApp.fetch(apiUrl, { headers, muteHttpExceptions: true });
+  if (getRes.getResponseCode() !== 200) {
+    throw new Error(`GitHub GET sites.js failed (HTTP ${getRes.getResponseCode()}): ${getRes.getContentText()}`);
+  }
   const fileData = JSON.parse(getRes.getContentText());
   const sha      = fileData.sha;
 
@@ -147,7 +216,7 @@ function addToGitHub_({ name, url, type, club, location, description }) {
   const updatedContent = currentContent.replace(/\];\s*$/, `\n${newEntry}\n];`);
   const encoded = Utilities.base64Encode(Utilities.newBlob(updatedContent, 'UTF-8').getBytes());
 
-  UrlFetchApp.fetch(apiUrl, {
+  const putRes = UrlFetchApp.fetch(apiUrl, {
     method: 'put',
     headers,
     payload: JSON.stringify({
@@ -158,6 +227,11 @@ function addToGitHub_({ name, url, type, club, location, description }) {
     }),
     muteHttpExceptions: true,
   });
+
+  const putCode = putRes.getResponseCode();
+  if (putCode !== 200 && putCode !== 201) {
+    throw new Error(`GitHub update of sites.js failed (HTTP ${putCode}): ${putRes.getContentText()}`);
+  }
 }
 
 // ── Send approval email to submitter ─────────────────────────────────────
