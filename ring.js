@@ -1,4 +1,15 @@
 (() => {
+  // Only allow http(s) links from site data, so a bad entry can't inject
+  // javascript: or data: URLs into hrefs or redirects.
+  function safeUrl(u) {
+    try {
+      const parsed = new URL(u);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null;
+    } catch {
+      return null;
+    }
+  }
+
   // ── Navigation redirect ───────────────────────────────────────────────────
   function tryRedirect() {
     const raw = window.location.hash.slice(1);
@@ -25,7 +36,9 @@
         ? SITES[(idx + 1) % total]
         : SITES[(idx - 1 + total) % total];
 
-    window.location.replace(target.url);
+    const dest = safeUrl(target.url);
+    if (!dest) return false;
+    window.location.replace(dest);
     return true;
   }
 
@@ -417,7 +430,7 @@
     document.getElementById('card-description').textContent = site.description || '';
 
     const visitLink = document.getElementById('card-visit');
-    visitLink.href = site.url;
+    visitLink.href = safeUrl(site.url) || '#';
     const hostname = (() => { try { return new URL(site.url).hostname; } catch { return site.url; } })();
     visitLink.textContent = `visit ${hostname} →`;
 
@@ -578,19 +591,34 @@
       const typeClass = TYPE_CLASS[site.type] || '';
       const country = getCountry(site.location);
       const flag = countryFlag(country) || country;
-      const flagHtml = flag ? `<span class="site-row-flag">${flag}</span> ` : '';
-      const meta = flagHtml + (site.club || '');
       const hostname = (() => { try { return new URL(site.url).hostname; } catch { return site.url; } })();
 
-      row.innerHTML =
-        `<div class="site-row-main">` +
-          `<span class="site-row-name">${site.name}</span>` +
-          `<span class="site-row-type ${typeClass}">${typeLabel}</span>` +
-        `</div>` +
-        `<div class="site-row-sub">` +
-          `<span class="site-row-location">${meta}</span>` +
-          `<a class="site-row-url" href="${site.url}" target="_blank" rel="noopener">${hostname}</a>` +
-        `</div>`;
+      const el = (tag, cls, text) => {
+        const node = document.createElement(tag);
+        if (cls) node.className = cls;
+        if (text) node.textContent = text;
+        return node;
+      };
+
+      const main = el('div', 'site-row-main');
+      main.append(
+        el('span', 'site-row-name', site.name),
+        el('span', `site-row-type ${typeClass}`.trim(), typeLabel),
+      );
+
+      const locationEl = el('span', 'site-row-location');
+      if (flag) locationEl.append(el('span', 'site-row-flag', flag), ' ');
+      if (site.club) locationEl.append(site.club);
+
+      const link = el('a', 'site-row-url', hostname);
+      link.href = safeUrl(site.url) || '#';
+      link.target = '_blank';
+      link.rel = 'noopener';
+
+      const sub = el('div', 'site-row-sub');
+      sub.append(locationEl, link);
+
+      row.append(main, sub);
 
       row.addEventListener('click', (e) => {
         if (e.target.classList.contains('site-row-url')) return;
